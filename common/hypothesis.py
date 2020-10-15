@@ -54,6 +54,31 @@ class OTA(object):
             value = 0
         return DRTWs, value
 
+    # build simple hypothesis - merge guards
+    def build_simple_hypothesis(self):
+        actions = self.actions
+        states = self.states
+        init_state = self.init_state
+        accept_states = self.accept_states
+        trans = []
+        tran_num = 0
+        for s in self.states:
+            for t in self.states:
+                for action in actions:
+                    for reset in [True, False]:
+                        temp = []
+                        for tran in self.trans:
+                            if tran.source == s and tran.action == action and tran.target == t and tran.reset == reset:
+                                temp.append(tran)
+                        if temp:
+                            guards = []
+                            for i in temp:
+                                guards += i.guards
+                            guards = simple_guards(guards)
+                            trans.append(OTATran(tran_num, s, action, guards, reset, t))
+                            tran_num += 1
+        return OTA(actions, states, trans, init_state, accept_states)
+
     # Get the max time value constant appearing in OTA.
     def max_time_value(self):
         max_time_value = 0

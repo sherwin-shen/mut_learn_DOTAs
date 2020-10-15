@@ -1,7 +1,6 @@
 import copy
 from common.TimedWord import TimedWord, ResetTimedWord
 from common.TimeInterval import Guard, BracketNum, Bracket
-from common.hypothesis import OTA, OTATran
 
 
 class System(object):
@@ -105,6 +104,19 @@ class System(object):
                 value = 0
         return cur_state, value, reset
 
+    # Get the max time value constant appearing in OTA.
+    def max_time_value(self):
+        max_time_value = 0
+        for tran in self.trans:
+            for c in tran.guards:
+                if c.max_value == '+':
+                    temp_max_value = float(c.min_value) + 1
+                else:
+                    temp_max_value = float(c.max_value)
+                if max_time_value < temp_max_value:
+                    max_time_value = temp_max_value
+        return max_time_value
+
 
 class SysTran(object):
     def __init__(self, tran_id, source, action, guards, reset, target):
@@ -183,12 +195,14 @@ def build_canonicalOTA(system):
                 addGuards = [Guard('[0,+)')]
             if len(addGuards) > 0:
                 for guard in addGuards:
-                    tempTran = OTATran(tranNumber, state, key, [guard], False, state)
+                    tempTran = SysTran(tranNumber, state, key, [guard], False, state)
                     tranNumber = tranNumber + 1
                     newTrans.append(tempTran)
-    newOTA = OTA(actions, states, trans, init_state, accept_states)
+    newOTA = System(actions, states, trans, init_state, accept_states)
     return newOTA
 
+
+# --------------------------------- auxiliary function ---------------------------------
 
 # 补全区间
 def complement_intervals(guards):

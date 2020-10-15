@@ -1,8 +1,7 @@
 from copy import deepcopy
-import random
 from common.equivalence import equivalence
 from common.system import build_canonicalOTA
-from common.TimedWord import TimedWord
+from testing.random_testing import test_generation_1
 
 
 def validate(learned_system, system, upper_guard):
@@ -17,25 +16,13 @@ def validate(learned_system, system, upper_guard):
         failNum = 0
         testNum = 20000
         for i in range(testNum):
-            sample = sample_generation(learned_system.actions, upper_guard, len(learned_system.states))
+            sample = test_generation_1(learned_system.actions, upper_guard, len(learned_system.states))
             system_res, real_value = new_system.test_DTWs(sample)
             hypothesis_res, value = learned_system.test_DTWs(sample)
-            if system_res != hypothesis_res:
+            if real_value == value and system_res != hypothesis_res:
+                system_res, real_value = new_system.test_DTWs(sample)
+                print([i.show() for i in sample], [i.show() for i in system_res], [i.show() for i in hypothesis_res], real_value, value)
+            if real_value != value:
                 failNum += 1
         passingRate = (testNum - failNum) / testNum
     return correct_flag, passingRate
-
-
-def sample_generation(actions, upperGuard, stateNum):
-    sample = []
-    length = random.randint(1, stateNum * 2)
-    for i in range(length):
-        action = actions[random.randint(0, len(actions) - 1)]
-        time = random.randint(0, upperGuard * 2 + 1)
-        if time % 2 == 0:
-            time = time // 2
-        else:
-            time = time // 2 + 0.5
-        temp = TimedWord(action, time)
-        sample.append(temp)
-    return sample
