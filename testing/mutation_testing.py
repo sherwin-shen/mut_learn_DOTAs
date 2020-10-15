@@ -1,7 +1,47 @@
 import random
 import queue
-from copy import deepcopy
+import copy
 from common.TimedWord import TimedWord
+from testing.random_testing import test_generation_2
+
+
+# --------------------------------- 算法1 - mutation testing用于测试集筛选 ---------------------------------
+
+def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
+    # 生成候选测试集
+    test_num = 2000
+    tests = []
+    pretry = 0.9
+    pstop = 0.02
+    linfix = int(state_num / 2)
+    max_steps = 2 * state_num
+    for i in range(test_num):
+        tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
+
+    # 生成变异体及变异分析
+    Tsel = []
+    cMuts = []
+    nacc = 4
+    nsel = 100
+    mutations = mutant_generation(hypothesisOTA, upper_guard, nacc)
+    if len(mutations) > 0:
+        IMutsel = mutant_sample(hypothesisOTA.states, mutations)
+        NMut = NFA_mutant(hypothesisOTA, IMutsel)
+        pre_tests = []
+        for t0 in tests:
+            cMut = mutation_analysis(t0, NMut)
+            if cMut:
+                pre_tests.append(t0)
+                cMuts.append(cMut)
+        if cMuts:
+            Tsel = test_selection(pre_tests, IMutsel, cMuts, nsel)  # 选择尽可能少的测试集覆盖cMuts里所包含的muts
+
+    # 测试执行
+    if len(Tsel) > 0:
+        equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
+    else:
+        raise Exception("Mutation Failed!")
+    return equivalent, ctx
 
 
 class Mut(object):
@@ -179,7 +219,6 @@ def mutation_analysis(test, NMut):
             for n1 in n:
                 if n1 not in next:
                     next.append(n1)
-        check!!!!
         for sn in next:
             if len(t[2]) == 2:
                 if (sn in F) and (not sn[1] in cMut):
@@ -218,7 +257,67 @@ def test_selection(Tests, C, Cset, nsel):
     return Tsel
 
 
+# 测试执行
+def test_execution(hypothesisOTA, system, tests):
+    flag = True
+    ctx = []
+    for test in tests:
+        DRTWs, value = hypothesisOTA.test_DTWs(test)
+        realDRTWs, realValue = system.test_DTWs(test)
+        if realValue != value:
+            flag = False
+            ctx = test
+            break
+    return flag, ctx
+
+
+# --------------------------------- 算法2 - mutation testing用于测试集生成 ---------------------------------
+
+def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
+    pass
+
+
 # --------------------------------- auxiliary function ---------------------------------
+
+def coin_flip(p):
+    return random.random() <= p
+
+
+# find a path from s1 to s2
+def find_path(hypothesis, upper_guard, now_time, s1, s2):
+    init_now_time = now_time
+    visited = []
+    next_to_explore = queue.Queue()
+    next_to_explore.put([s1, []])
+
+    while not next_to_explore.empty():
+        [sc, path] = next_to_explore.get()
+        if path is None:
+            path = []
+        if sc not in visited:
+            visited.append(sc)
+            for i in hypothesis.actions:
+                time = random.randint(0, upper_guard * 2 + 1)
+                if time % 2 == 0:
+                    time = time // 2
+                else:
+                    time = time // 2 + 0.5
+                temp_DTW = TimedWord(i, time)
+                temp_LTW = TimedWord(i, time + now_time)
+                sn = None
+                for ts in hypothesis.trans:
+                    if ts.source == sc and ts.is_passing_tran(temp_LTW):
+                        sn = ts.target
+                        if ts.reset:
+                            now_time = 0
+                        else:
+                            now_time = temp_LTW.time
+                        break
+                if sn == s2:
+                    path.append(temp_DTW)
+                    return path, now_time
+                next_to_explore.put([sn, copy.deepcopy(path).append(temp_DTW)])
+    return None, init_now_time
 
 
 def get_all_acc(hypothesis, s2, upper_guard):
@@ -235,19 +334,18 @@ def get_all_acc(hypothesis, s2, upper_guard):
         if path0 is None:
             path0 = []
 
-        for i in hypothesis.inputs:
+        for i in hypothesis.actions:
             time = random.randint(0, upper_guard * 2 + 1)
-            check!!!!
             if time % 2 == 0:
                 time = time // 2
             else:
-                ....
+                pass
             temp_DTW = TimedWord(i, time)
             pass
             sn = sc
             p = hypothesis.trans[0]
             for ts in hypothesis.trans:
-                if ts.source == sc and ts.is_passing_tran(temp):
+                if ts.source == sc and ts.is_passing_tran(temp_DTW):
                     if ts.target != sc:
                         sn = ts.target
                         p = ts
@@ -255,7 +353,7 @@ def get_all_acc(hypothesis, s2, upper_guard):
 
             if sn == s2:
                 path0.append(p)
-                path1 = deepcopy(path0)
+                path1 = copy.deepcopy(path0)
                 if path0 not in paths:
                     num += 1
                     paths.append(path1)
@@ -264,7 +362,7 @@ def get_all_acc(hypothesis, s2, upper_guard):
                 path0.pop()
                 break
             path0.append(p)
-            path2 = deepcopy(path0)
+            path2 = copy.deepcopy(path0)
             next0.put([sn, path2])
             path0.pop()
     return paths
@@ -323,7 +421,7 @@ def arg_min(Tests, C, Cset):
         if not ct:
             i += 1
             continue
-        CC = deepcopy(C)
+        CC = copy.deepcopy(C)
         for m1 in ct:
             for m2 in CC:
                 if m1.mId == m2.mId:
