@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     ### file directory
     # file_path = sys.argv[1]
-    file_path = "Automata"
+    file_path = "benchmarks/3_2_10/3_2_10-1"
     # target model file
     model_file = file_path + "/model.json"
     # prior information required for learning

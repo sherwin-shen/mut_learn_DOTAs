@@ -257,6 +257,14 @@ def test_selection(Tests, C, Cset, nsel):
     return Tsel
 
 
+# --------------------------------- 算法2 - mutation testing用于测试集生成 ---------------------------------
+
+def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
+    pass
+
+
+# --------------------------------- auxiliary function ---------------------------------
+
 # 测试执行
 def test_execution(hypothesisOTA, system, tests):
     flag = True
@@ -270,14 +278,6 @@ def test_execution(hypothesisOTA, system, tests):
             break
     return flag, ctx
 
-
-# --------------------------------- 算法2 - mutation testing用于测试集生成 ---------------------------------
-
-def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
-    pass
-
-
-# --------------------------------- auxiliary function ---------------------------------
 
 def coin_flip(p):
     return random.random() <= p
