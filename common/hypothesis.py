@@ -221,7 +221,29 @@ def struct_hypothesisOTA(discreteOTA):
                     trans.append(OTATran(tran.tran_id, tran.source, tran.action, [guard], tran.reset, tran.target))
     return OTA(discreteOTA.actions, discreteOTA.states, trans, discreteOTA.init_state, discreteOTA.accept_states)
 
-
+def struct_simpleHypothesis(hypothesis):
+    actions = hypothesis.actions
+    states = hypothesis.states
+    init_state = hypothesis.init_state
+    accept_states = hypothesis.accept_states
+    trans = []
+    tranNum = 0
+    for s in hypothesis.states:
+        for t in hypothesis.states:
+            for action in actions:
+                for reset in [True, False]:
+                    temp = []
+                    for tran in hypothesis.trans:
+                        if tran.source == s and tran.action == action and tran.target == t and tran.reset == reset:
+                            temp.append(tran)
+                    if temp:
+                        guards = []
+                        for i in temp:
+                            guards += i.guards
+                        guards = simple_guards(guards)
+                        trans.append(OTATran(tranNum, s, action, guards, reset, t))
+                        tranNum += 1
+    return OTA(actions, states, trans, init_state, accept_states)
 # --------------------------------- auxiliary function ---------------------------------
 
 # Determine whether two LRTWs are the same

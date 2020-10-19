@@ -36,11 +36,11 @@ def test_generation_1(actions, upper_guard, state_num):
 
 # 随机测试算法2 - 源自：Efficient Active Automata Learning via Mutation Testing
 def random_testing_2(hypothesis, upper_guard, state_num, system):
-    test_num = 5000
+    test_num = len(hypothesis.states)*len(hypothesis.actions)*300
     pretry = 0.9
     pstop = 0.02
-    linfix = int(state_num / 2)
-    max_steps = int(1.5 * state_num)
+    linfix = int(len(hypothesis.states) / 2)+1
+    max_steps = int(1.5 * len(hypothesis.states))
 
     ctx = None
     for i in range(test_num):
@@ -65,7 +65,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
     if coin_flip(0.5):
         actions = []
         for i in range(li):
-            actions.append(random.sample(hypothesis.actions, 1)[0])
+            actions.append(random.choice(hypothesis.actions))
         for action in actions:
             time = get_random_delay(upper_guard)
             temp_DTW = TimedWord(action, time)
@@ -101,7 +101,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
             li = random.randint(1, linfix)
             rSteps_i = []
             for i in range(li):
-                rSteps_i.append(random.sample(hypothesis.actions, 1)[0])
+                rSteps_i.append(random.choice(hypothesis.actions))
             rSteps = []
             for rsi in rSteps_i:
                 time = get_random_delay(upper_guard)
@@ -289,11 +289,11 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
 
 
 def get_random_delay(upper_guard):
-    time = random.randint(0, upper_guard * 3 + 1)
-    if time % 2 == 0:
-        time = time // 2
+    time = random.randint(0, upper_guard * 2 + 1)
+    if time % 3 == 0:
+        time = time // 3
     else:
-        time = time // 2 + 0.5
+        time = time // 3 + 0.5
     return time
 
 

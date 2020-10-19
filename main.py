@@ -43,7 +43,7 @@ def main():
         # validate
         correct_flag, passing_rate = validate(learned_system, system, upper_guard)
         make_hypothesis(learned_system, result_path, '/model_hypothesis')
-        print("———————————————————————————————————————————")
+        print("***********************************************")
         print("Succeed! The result is as follows:")
         print("Total time of learning: " + str(end_time - start_time))
         print("Total number of MQs (no-cache): " + str(mq_num))
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     ### file directory
     # file_path = sys.argv[1]
-    file_path = "benchmarks/3_2_10/3_2_10-1"
+    file_path = "benchmarks/3_2_10/3_2_10-2"
     # target model file
     model_file = file_path + "/model.json"
     # prior information required for learning

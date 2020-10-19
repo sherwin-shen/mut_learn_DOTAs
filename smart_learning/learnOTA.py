@@ -15,6 +15,7 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
     equivalent = False
     learned_system = None  # learned model
     table_num = 1  # number of table
+    hy_num = 1
 
     while not equivalent:
         ### make table prepared
@@ -57,7 +58,9 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
             hypothesisOTA.show_OTA()
 
         ### EQs
-        equivalent, ctx = EQs(hypothesisOTA, upper_guard, state_num, system)
+
+        equivalent, ctx = EQs(hypothesisOTA, upper_guard, state_num, system, hy_num)
+        hy_num += 1
 
         if not equivalent:
             # show ctx
