@@ -354,17 +354,16 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
 
 def get_all_acc(hypothesis, s2):
     s1 = hypothesis.init_state
-    next = queue.Queue()
-    next.put([s1, None])
-    paths = []
     visited = []
-
+    next_to_explore = queue.Queue()
+    next_to_explore.put([s1, []])
+    paths = []
     num = 0
-    max_num = 1000
-    max_paths_length = 5
-    while not next.empty() and num < max_num and len(paths) < max_paths_length:
-        num += 1
-        [sc, path] = next.get()
+    max_num = 2000
+    max_paths_length = int(len(hypothesis.states)*1.5)
+
+    while not next_to_explore.empty() and num < max_num:
+        [sc, path] = next_to_explore.get()
         if path is None:
             path = []
         for tran in hypothesis.trans:
@@ -376,13 +375,14 @@ def get_all_acc(hypothesis, s2):
                 if path not in paths:
                     num += 1
                     paths.append(copy.deepcopy(path))
-                else:
-                    num += 0
                 path.pop()
                 break
             path.append(tran)
-            next.put([sn, copy.deepcopy(path)])
-            path.pop()
+            if len(path) >= max_paths_length:
+                break
+            else:
+              next_to_explore.put([sn, copy.deepcopy(path)])
+              path.pop()
     return paths
 
 
@@ -417,6 +417,7 @@ def get_Ik(hypothesis, qs):
                 if trans2.source == trans1.target:
                     Ik.append([trans1] + [trans2])
     return Ik
+
 
 
 def arg_maxs(s1, s2):

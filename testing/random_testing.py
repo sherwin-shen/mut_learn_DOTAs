@@ -36,7 +36,7 @@ def test_generation_1(actions, upper_guard, state_num):
 
 # 随机测试算法2 - 源自：Efficient Active Automata Learning via Mutation Testing
 def random_testing_2(hypothesis, upper_guard, state_num, system):
-    test_num = len(hypothesis.states)*len(hypothesis.actions)*300
+    test_num = 5000
     pretry = 0.9
     pstop = 0.02
     linfix = int(len(hypothesis.states) / 2)+1
@@ -289,11 +289,11 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
 
 
 def get_random_delay(upper_guard):
-    time = random.randint(0, upper_guard * 2 + 1)
-    if time % 3 == 0:
-        time = time // 3
+    time = random.randint(0, upper_guard * 3 + 1)
+    if time % 2 == 0:
+        time = time // 2
     else:
-        time = time // 3 + 0.5
+        time = time // 2 + 0.5
     return time
 
 
