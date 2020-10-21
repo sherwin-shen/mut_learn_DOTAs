@@ -198,7 +198,7 @@ def build_canonicalOTA(system):
                     tempTran = SysTran(tranNumber, state, key, [guard], False, state)
                     tranNumber = tranNumber + 1
                     newTrans.append(tempTran)
-    newOTA = System(actions, states, trans, init_state, accept_states)
+    newOTA = System(actions, states, trans+newTrans, init_state, accept_states)
     return newOTA
 
 

@@ -18,13 +18,19 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
     for i in range(test_num):
         tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
 
+    #状态数为1 特殊处理：
+    if len(hypothesisOTA.states) == 1:
+        equivalent, ctx = test_execution(hypothesisOTA, system, tests)
+        return equivalent, ctx
+
+
     # 生成变异体及变异分析
     Tsel = []
     cMuts = []
     IMutsel = []
-    nacc = 5
+    nacc = 20
     nsel = 100
-    mutations = mutant_generation(hypothesisOTA, nacc)
+    mutations = mutant_generation_split(hypothesisOTA, nacc)
     if len(mutations) > 0:
         #IMutsample = mutant_sample(hypothesisOTA.states, mutations)
         IMutsample = mutations
@@ -43,6 +49,7 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
             Tsel = test_selection(pre_tests, IMutsel, cMuts, 2000)  # 选择尽可能少的测试集覆盖cMuts里所包含的muts
         print("lenth of Tsel:", len(Tsel))
     else:
+        #raise Exception("Mutation Failed!")
         print("Mutation Failed!")
         equivalent, ctx = test_execution(hypothesisOTA, system, tests)
 
@@ -87,20 +94,42 @@ class CoverATree_Node(object):
         self.nextstates.append(states)
 
 
+def mutant_generation_guard(hypothesis):
+    Muts = []
+    mId=0
+    for q in hypothesis.states:
+        pre_action=[]
+        for tran in hypothesis.trans:
+            if tran.target == q and tran.target != tran.source:
+                pre_action.append(tran)
+        Ik = get_Ik(hypothesis, q)
+        for i in range(len(Ik))-1:
+            I1 = Ik[i]
+            j = i+1
+            while j < len(len(Ik)):
+                I2 = Ik[j]
+                if not(bool(I1[-1].target in hypothesis.accept_states) ^ bool(I2[-1].target in hypothesis.accept_states)):
+                    Mut1 = Mut(hypothesis, q, random.choice(pre_action), I1, mId)
+                    mId += 1
+                    Mut2 = Mut(hypothesis, q, random.choice(pre_action), I2, mId)
+                    mId += 1
 
-def mutant_generation(hypothesis, nacc):
+
+
+    return
+
+def mutant_generation_split(hypothesis, nacc):
     Muts = []
     mId=0
 
     for q in hypothesis.states:
-        li = nacc
         set_accq = get_all_acc(hypothesis, q)
-        if len(set_accq) <= 1:
+        if len(set_accq) <= 2:
             continue
         elif nacc >= len(set_accq):
             subset_accq = set_accq
         else:
-            subset_accq = random.sample(set_accq, li)
+            subset_accq = random.sample(set_accq, nacc)
         for s1 in subset_accq:
             if len(s1) < 1:
                 continue
@@ -178,7 +207,7 @@ def NFA_mutant(hypothesis, IMut):
     return NMut
 
 
-def mutation_analysis1(test, NMut,IMutsel):
+def mutation_analysis1(test, NMut,IMutsel):  #abandon 弃用
     s0 = NMut.s_state
     T = NMut.trans
     F = NMut.f_states
@@ -259,32 +288,25 @@ def mutation_analysis(test, NMut, IMutsel):
 
 def test_selection(Tests, C, Cset, nsel): #C:all mutations; Cset:cover mutation set
     Tsel = []
-    lable1 = False
+    intersectionEmpty = True
     CC = copy.deepcopy(C)
     tests = copy.deepcopy(Tests)
     cset = copy.deepcopy(Cset)
     while len(Tsel) < nsel and CC:
-        lable2 = False
         i, topt = arg_min(tests, CC, cset)
         Ctopt = cset[i]
         if not Ctopt:
             break
-        for cc1 in Ctopt:
-            for cc2 in CC:
-                if cc1 == cc2:
-                    lable1 = True
-                    lable2 = True
-                    break
-            if lable1:
-                lable1 = False
+        for c in Ctopt:
+            if c in CC:
+                intersectionEmpty = False
                 break
-        if not lable2:
+        if intersectionEmpty:
             break
         Tsel.append(topt)
-        for c1 in Ctopt:
-            for c2 in CC:
-                if c1 == c2:
-                    CC.remove(c2)
+        for c in Ctopt:
+            if c in CC:
+                CC.remove(c)
     return Tsel
 
 
@@ -351,18 +373,136 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
                 next_to_explore.put([sn, path1.append(temp_DTW)])
     return None, init_now_time
 
+def tree_create(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index):
+    nowNode = CoverATree_Node(state, preTime)
 
+    if test_index>=len(Test):
+        return nowNode
+    time = Test[test_index].time + preTime
+    newTest = TimedWord(Test[test_index].action, time)
+
+    if len(state) == 2:
+        if state in F_states and (state[1] not in cMut):
+            cMut.append(state[1])
+            if state[1] not in IMutsel:
+                IMutsel.append(state[1])
+
+    for tran in Trans:
+        if tran[0] == state and tran[1].is_passing_tran(newTest):
+            if tran[1].reset:
+                tempTime = 0
+            else:
+                tempTime = time
+
+            childNode = tree_create(tran[2], tempTime, Trans, F_states, cMut, IMutsel, Test, test_index+1)
+            nowNode.addNextStates(childNode)
+
+'''
+def get_next_tran(hypothesis, sn, s2, paths, max_path_length, max_paths_num, tran):
+    #next_tran = None
+    path=[]
+    
+    if sn == s2:
+        print([[i.source, i.target] for i in path])
+        if path not in paths:
+            paths.append(path)
+        return tran
+    print(paths)
+    if len(paths )> max_paths_num:
+        return tran
+    if len(path) > max_path_length:
+        return tran
+    for tran in hypothesis.trans:
+        if tran.source == sn:
+            if sn == s2:
+                print([[i.source, i.target] for i in path])
+                if path not in paths:
+                    paths.append(path)
+                return tran
+            if len(path) > max_path_length:
+                return tran
+            path.append(get_next_tran(hypothesis, tran.target, s2, paths, max_path_length,  max_paths_num, tran))
+            #if len(path)>max_path_length:
+            #    break
+            #get_next_tran(hypothesis, tran.target, s2, paths, path, max_path_length,  max_paths_num)
+
+
+    #return paths
+'''
+# get mutated access seq leading to a single state
 def get_all_acc(hypothesis, s2):
+    paths = []
+    max_path_length = int(len(hypothesis.states) * 2.5)
+
+    def get_next_tran(sn, path):
+        if sn == s2 and path:
+            if path not in paths and len(path) > 2:
+                paths.append(path)
+            return
+        if len(path) > max_path_length:
+            return
+        for tran in hypothesis.trans:
+            if tran.source == sn:
+                if len(path) >= 2 and tran.target == sn:
+                    if path[-1].source == sn and path[-2].source == sn:
+                        continue
+                get_next_tran(tran.target, copy.deepcopy(path)+[tran])
+
+    get_next_tran(hypothesis.init_state, [])
+    return paths
+
+# get mutated access seq leading to a single state
+
+
+def get_all_acc2(hypothesis, s2):
     s1 = hypothesis.init_state
-    visited = []
+    next_to_explore = queue.Queue()
+    next_to_explore.put([s1, []])
+    paths = []
+    visited=[]
+    num = 0
+    max_num = 2000
+    max_path_length = int(len(hypothesis.states)*2.5)
+    max_paths_num=int(len(hypothesis.states)*len(hypothesis.actions))*2
+
+    while num < max_num and len(paths) < max_paths_num:
+        next_to_explore = queue.Queue()
+        next_to_explore.put([s1, []])
+        visited = []
+        while not next_to_explore.empty() and num < max_num and len(paths) < max_paths_num:
+            [sc, path] = next_to_explore.get()
+            if path is None:
+                path = []
+            if sc not in visited:
+                visited.append(sc)
+                for ts in hypothesis.trans:
+                    sn = None
+                    if ts.source == sc:
+                        sn = ts.target
+                    path.append(ts)
+                    break
+                if sn == s2:
+                    paths.append(copy.deepcopy(path))
+                    break
+                    #return path, now_time
+                if len(path) >= max_path_length:
+                    sn = s1
+                    break
+                else:
+                    next_to_explore.put([sn, copy.deepcopy(path)])
+    return paths
+
+def get_all_acc1(hypothesis, s2):
+    s1 = hypothesis.init_state
     next_to_explore = queue.Queue()
     next_to_explore.put([s1, []])
     paths = []
     num = 0
     max_num = 2000
-    max_paths_length = int(len(hypothesis.states)*1.5)
+    max_path_length = int(len(hypothesis.states)*2.5)
+    max_paths_num=int(len(hypothesis.states)*len(hypothesis.actions))*2
 
-    while not next_to_explore.empty() and num < max_num:
+    while not next_to_explore.empty() and num < max_num and len(paths) < max_paths_num:
         [sc, path] = next_to_explore.get()
         if path is None:
             path = []
@@ -373,16 +513,17 @@ def get_all_acc(hypothesis, s2):
             if sn == s2:
                 path.append(tran)
                 if path not in paths:
+                    print([[i.source, i.target] for i in path])
                     num += 1
                     paths.append(copy.deepcopy(path))
                 path.pop()
                 break
             path.append(tran)
-            if len(path) >= max_paths_length:
+            if len(path) >= max_path_length:
                 break
             else:
-              next_to_explore.put([sn, copy.deepcopy(path)])
-              path.pop()
+                next_to_explore.put([sn, copy.deepcopy(path)])
+                path.pop()
     return paths
 
 
@@ -398,7 +539,7 @@ def mut_split(s1, s2, hypothesis, mId):
         return None, mId
     pI = ss1[len(ss1) - 1]
     Mutants = list()
-    Ik = get_Ik(hypothesis, pI.target)
+    Ik = get_Ik(hypothesis, s1[-1].target, 2)
     for distSeq in Ik:
         H = hypothesis
         qpre = pI.source
@@ -409,7 +550,7 @@ def mut_split(s1, s2, hypothesis, mId):
     return Mutants, mId
 
 
-def get_Ik(hypothesis, qs):
+def get_Ik1(hypothesis, qs):
     Ik = []
     for trans1 in hypothesis.trans:
         if trans1.source == qs:
@@ -419,6 +560,21 @@ def get_Ik(hypothesis, qs):
     return Ik
 
 
+# 找到 qs状态后走step的所有路径
+def get_Ik(hypothesis, qs, step):
+    IK = []
+    def recursion(cur_state, paths):
+        if len(paths) == step:
+            if paths not in IK:
+                IK.append(paths)
+            return True
+        for tran in hypothesis.trans:
+            if tran.source == cur_state:
+                recursion(tran.target, copy.deepcopy(paths) + [tran])
+    recursion(qs, [])
+    return IK
+
+
 
 def arg_maxs(s1, s2):
     ts = []
@@ -426,7 +582,7 @@ def arg_maxs(s1, s2):
     for i in range(n1):
         if not s1[-1 - i].tran_id == s2[-1 - i].tran_id:
             break
-        ts = s1[(n1 - 1 - i):]
+        ts = s1[(- 1 - i):]
     return ts
 
 
@@ -439,10 +595,9 @@ def arg_min(Tests, C, Cset): #C:mutations sets; Cset:cover sets
             i += 1
             continue
         CC = copy.deepcopy(C)
-        for m1 in ct:
-            for m2 in CC:
-                if m1 == m2:
-                    CC.remove(m2)
+        for c in ct:
+            if c in CC:
+                CC.remove(c)
         t_min = len(CC)
         if t_min < min:
             index = i
@@ -481,3 +636,21 @@ def tree_create(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index
 
             childNode = tree_create(tran[2], tempTime, Trans, F_states, cMut, IMutsel, Test, test_index+1)
             nowNode.addNextStates(childNode)
+
+
+if __name__ == '__main__':
+    import json
+    from common.system import build_system, build_canonicalOTA
+    from common.make_pic import make_system
+
+    model_file = '../benchmarks/3_2_10/3_2_10-1/model.json'
+    with open(model_file, 'r') as json_model:
+        model = json.load(json_model)
+    system = build_system(model)
+    system = build_canonicalOTA(system)
+    make_system(system, 'result_path', '/model_target')
+
+    #paths_temp = get_Ik(system, system.states[1], 2)
+    paths_temp = get_all_acc(system, '1')
+    for cur_path in paths_temp:
+       print([[i.source, i.target] for i in cur_path])

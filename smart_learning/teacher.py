@@ -5,6 +5,7 @@ from testing.mutation_testing import mutation_testing_1
 from common.hypothesis import struct_simpleHypothesis
 from common.make_pic import make_full_hypothesis
 
+
 # LRTWs + value
 def TQs(LTWs, system):
     LRTWs, value = system.test_LTWs(LTWs)
