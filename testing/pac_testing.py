@@ -1,7 +1,6 @@
 import math
-import copy
 import random
-from common.TimedWord import TimedWord, DRTW_to_LRTW, LRTW_to_LTW
+from common.TimedWord import TimedWord
 
 
 def pac_testing(hypothesis, upper_guard, state_num, system):
@@ -21,7 +20,6 @@ def pac_testing(hypothesis, upper_guard, state_num, system):
                 ctx = sample
                 break
         if ctx is not None:
-            ctx = minimize_counterexample(hypothesis, system, ctx)
             return False, ctx
     return True, ctx
 
@@ -103,57 +101,7 @@ def test_execution(hypothesis, system, sample):
     return real_value != value
 
 
-# 最小化反例
-def minimize_counterexample(hypothesis, system, ctx):
-    ### 最小化反例的长度
-    mini_ctx = []
-    for dtw in ctx:
-        mini_ctx.append(dtw)
-        if test_execution(hypothesis, system, mini_ctx):
-            break
-    ### 局部最小化反例的时间
-    # Find sequence of reset information
-    reset = []
-    DRTWs, value = system.test_DTWs(mini_ctx)
-    for drtw in DRTWs:
-        reset.append(drtw.reset)
-    # ctx to LTWs
-    LTWs = LRTW_to_LTW(DRTW_to_LRTW(DRTWs))
-    # start minimize
-    for i in range(len(LTWs)):
-        while True:
-            if i == 0 or reset[i - 1]:
-                can_reduce = (LTWs[i].time > 0)
-            else:
-                can_reduce = (LTWs[i].time > LTWs[i - 1].time)
-            if not can_reduce:
-                break
-            LTWs_temp = copy.deepcopy(LTWs)
-            LTWs_temp[i] = TimedWord(LTWs[i].action, one_lower(LTWs[i].time))
-            if not test_execution(hypothesis, system, LTW_to_DTW(LTWs_temp, reset)):
-                break
-            LTWs = copy.deepcopy(LTWs_temp)
-        return LTW_to_DTW(LTWs, reset)
-
-
 # --------------------------------- auxiliary function ---------------------------------
-
-def one_lower(x):
-    if x - int(x) == 0.5:
-        return int(x)
-    else:
-        return x - 0.5
-
-
-def LTW_to_DTW(LTWs, reset):
-    DTWs = []
-    for j in range(len(LTWs)):
-        if j == 0 or reset[j - 1]:
-            DTWs.append(TimedWord(LTWs[j].action, LTWs[j].time))
-        else:
-            DTWs.append(TimedWord(LTWs[j].action, LTWs[j].time - LTWs[j - 1].time))
-    return DTWs
-
 
 def get_random_delay(upper_guard):
     time = random.randint(0, upper_guard * 3 + 1)

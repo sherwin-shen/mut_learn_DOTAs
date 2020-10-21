@@ -2,7 +2,7 @@
 import random
 import copy
 import queue
-from common.TimedWord import TimedWord, DRTW_to_LRTW, LRTW_to_LTW
+from common.TimedWord import TimedWord
 
 
 # 随机测试算法1 - 完全随机采样
@@ -17,7 +17,6 @@ def random_testing_1(hypothesis, upper_guard, state_num, system):
             ctx = test
             break
     if ctx is not None:
-        ctx = minimize_counterexample(hypothesis, system, ctx)
         return False, ctx
     return True, ctx
 
@@ -50,7 +49,6 @@ def random_testing_2(hypothesis, upper_guard, state_num, system):
             ctx = test
             break
     if ctx is not None:
-        ctx = minimize_counterexample(hypothesis, system, ctx)
         return False, ctx
     return True, ctx
 
@@ -65,7 +63,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
     if coin_flip(0.5):
         actions = []
         for i in range(li):
-            actions.append(random.sample(hypothesis.actions, 1)[0])
+            actions.append(random.choice(hypothesis.actions))
         for action in actions:
             time = get_random_delay(upper_guard)
             temp_DTW = TimedWord(action, time)
@@ -79,7 +77,6 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
                     else:
                         now_time = temp_LTW.time
                     break
-
     while True:
         rS = random.choice(hypothesis.states)
         rI = random.choice(hypothesis.actions)
@@ -101,7 +98,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
             li = random.randint(1, linfix)
             rSteps_i = []
             for i in range(li):
-                rSteps_i.append(random.sample(hypothesis.actions, 1)[0])
+                rSteps_i.append(random.choice(hypothesis.actions))
             rSteps = []
             for rsi in rSteps_i:
                 time = get_random_delay(upper_guard)
@@ -141,7 +138,6 @@ def random_testing_3(hypothesis, upper_guard, state_num, system):
             ctx = test
             break
     if ctx is not None:
-        ctx = minimize_counterexample(hypothesis, system, ctx)
         return False, ctx
     return True, ctx
 
@@ -199,57 +195,7 @@ def test_execution(hypothesis, system, sample):
     return real_value != value
 
 
-# 最小化反例
-def minimize_counterexample(hypothesis, system, ctx):
-    ### 最小化反例的长度
-    mini_ctx = []
-    for dtw in ctx:
-        mini_ctx.append(dtw)
-        if test_execution(hypothesis, system, mini_ctx):
-            break
-    ### 局部最小化反例的时间
-    # Find sequence of reset information
-    reset = []
-    DRTWs, value = system.test_DTWs(mini_ctx)
-    for drtw in DRTWs:
-        reset.append(drtw.reset)
-    # ctx to LTWs
-    LTWs = LRTW_to_LTW(DRTW_to_LRTW(DRTWs))
-    # start minimize
-    for i in range(len(LTWs)):
-        while True:
-            if i == 0 or reset[i - 1]:
-                can_reduce = (LTWs[i].time > 0)
-            else:
-                can_reduce = (LTWs[i].time > LTWs[i - 1].time)
-            if not can_reduce:
-                break
-            LTWs_temp = copy.deepcopy(LTWs)
-            LTWs_temp[i] = TimedWord(LTWs[i].action, one_lower(LTWs[i].time))
-            if not test_execution(hypothesis, system, LTW_to_DTW(LTWs_temp, reset)):
-                break
-            LTWs = copy.deepcopy(LTWs_temp)
-        return LTW_to_DTW(LTWs, reset)
-
-
 # --------------------------------- auxiliary function ---------------------------------
-
-def one_lower(x):
-    if x - int(x) == 0.5:
-        return int(x)
-    else:
-        return x - 0.5
-
-
-def LTW_to_DTW(LTWs, reset):
-    DTWs = []
-    for j in range(len(LTWs)):
-        if j == 0 or reset[j - 1]:
-            DTWs.append(TimedWord(LTWs[j].action, LTWs[j].time))
-        else:
-            DTWs.append(TimedWord(LTWs[j].action, LTWs[j].time - LTWs[j - 1].time))
-    return DTWs
-
 
 def coin_flip(p):
     return random.random() <= p
