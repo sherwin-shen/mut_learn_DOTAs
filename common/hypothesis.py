@@ -219,7 +219,7 @@ def struct_hypothesisOTA(discreteOTA):
                     guards.append(tempGuard)
                 for guard in guards:
                     trans.append(OTATran(tran.tran_id, tran.source, tran.action, [guard], tran.reset, tran.target))
-    return OTA(discreteOTA.actions, discreteOTA.states, trans, discreteOTA.init_state, discreteOTA.accept_states)
+    return OTA(discreteOTA.actions, discreteOTA.states, trans, discreteOTA.init_state, discreteOTA.accept_states).build_simple_hypothesis()
 
 
 # --------------------------------- auxiliary function ---------------------------------

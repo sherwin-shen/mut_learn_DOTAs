@@ -44,7 +44,7 @@ def mutation_testing_1(hypothesisOTA, upper_guard, system):
     for i in range(test_num):
         tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
 
-    # 特殊处理状态为1情况
+    # 特殊处理状态数为1情况
     if len(hypothesisOTA.states) == 1:
         equivalent, ctx = test_execution(hypothesisOTA, system, tests)
         return equivalent, ctx
@@ -74,7 +74,8 @@ def mutation_testing_1(hypothesisOTA, upper_guard, system):
         if cMuts:
             Tsel = test_selection(pre_tests, IMutsel, cMuts, nsel)
     else:
-        raise Exception("Mutation Failed!")
+        # raise Exception("Mutation Failed!")
+        Tsel = tests
 
     # 测试执行
     equivalent = True
@@ -92,7 +93,7 @@ def mutant_generation_state(hypothesis, nacc):
     mId = 0
     for state in hypothesis.states:
         set_accq = get_all_acc(hypothesis, state)
-        if len(set_accq) <= 1:
+        if len(set_accq) < 2:
             continue
         elif nacc >= len(set_accq):
             subset_accq = set_accq
@@ -105,8 +106,6 @@ def mutant_generation_state(hypothesis, nacc):
                 if len(s2) < 1:
                     continue
                 if s1 == s2:
-                    continue
-                elif len(s1) < len(s2) and s2[0:len(s1)] == s1:
                     continue
                 else:
                     tMut, mId = mut_split(s1, s2, hypothesis, mId)

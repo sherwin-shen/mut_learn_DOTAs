@@ -21,7 +21,6 @@ def validate(learned_system, system, upper_guard):
             hypothesis_res, value = learned_system.test_DTWs(sample)
             if real_value == value and system_res != hypothesis_res:
                 system_res, real_value = new_system.test_DTWs(sample)
-                print([i.show() for i in sample], [i.show() for i in system_res], [i.show() for i in hypothesis_res], real_value, value)
             if real_value != value:
                 failNum += 1
         passingRate = (testNum - failNum) / testNum
