@@ -35,8 +35,6 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
                 consistent_flag, consistent_add = table.is_consistent()
                 table = obsTable.make_consistent(table, consistent_add, system)
                 table_num = table_num + 1
-                if table_num == 23:
-                    print('attention!')
                 if debug_flag:
                     print("***************** consistent-Table_" + str(table_num) + " is as follow *******************")
                     table.show()
