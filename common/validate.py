@@ -1,5 +1,5 @@
 from copy import deepcopy
-from common.equivalence import equivalence
+from common.equivalence_new import equivalence
 from common.system import build_canonicalOTA
 from testing.random_testing import test_generation_1
 
@@ -14,7 +14,7 @@ def validate(learned_system, system, upper_guard):
         passingRate = 1
     else:
         failNum = 0
-        testNum = 20000
+        testNum = 50000
         for i in range(testNum):
             sample = test_generation_1(learned_system.actions, upper_guard, len(learned_system.states))
             system_res, real_value = new_system.test_DTWs(sample)

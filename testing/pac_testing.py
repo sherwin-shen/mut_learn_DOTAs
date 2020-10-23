@@ -15,6 +15,8 @@ def pac_testing(hypothesis, upper_guard, state_num, system):
         while i < test_num // state_num:
             i += 1
             sample = sample_generation_valid(upper_guard, length, system)
+            while sample is None:
+                sample = sample_generation_valid(upper_guard, length, system)
             flag = test_execution(hypothesis, system, sample)
             if flag:
                 ctx = sample

@@ -40,11 +40,11 @@ def main():
         print("*********** learning ending  *************")
         return {"result": "Failed"}
     else:
-        # validate
-        correct_flag, passing_rate = validate(learned_system, system, upper_guard)
-        make_hypothesis(learned_system, result_path, '/model_hypothesis')
         print("———————————————————————————————————————————")
         print("Succeed! The result is as follows:")
+        # validate
+        make_hypothesis(learned_system, result_path, '/model_hypothesis')
+        correct_flag, passing_rate = validate(learned_system, system, upper_guard)
         print("Total time of learning: " + str(end_time - start_time))
         print("Total number of MQs (no-cache): " + str(mq_num))
         print("Total number of EQs (no-cache): " + str(eq_num))
