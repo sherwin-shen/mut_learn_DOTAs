@@ -9,7 +9,7 @@ from testing.random_testing import test_generation_2
 
 # --------------------------------- 算法1 - mutation testing用于测试集筛选 ---------------------------------
 
-def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
+def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
     # 生成候选测试集
     test_num = len(hypothesisOTA.states)*len(hypothesisOTA.states)*upper_guard*10
     tests = []
@@ -59,6 +59,36 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
     # 测试执行
     if len(Tsel) > 0:
         equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
+
+    #else:
+        #raise Exception("Mutation Failed!")
+    return equivalent, ctx
+
+def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
+    # 生成候选测试集
+    test_num = len(hypothesisOTA.states)*len(hypothesisOTA.states)*upper_guard*10
+    tests = []
+    pretry = 0.9
+    pstop = 0.02
+    linfix = int(len(hypothesisOTA.states) / 2)+1
+    max_steps = int(1.5 * state_num)
+    for i in range(test_num):
+        tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
+    print("lenth of tests:", len(tests))
+
+    #状态数为1 特殊处理：
+    #if len(hypothesisOTA.states) == 1:
+    #    equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests)
+    #    return equivalent, ctx
+
+
+    # 生成变异体及变异分析
+    Tsel = []
+    cMuts = []
+    IMutsel = []
+    nacc = 10
+    nsel = 100
+    equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests)
 
     #else:
         #raise Exception("Mutation Failed!")
@@ -122,7 +152,7 @@ def mutant_generation_guard(hypothesis, system, Tests):
     pre_tests = []
     Tsel = []
     for test in Tests:
-        cMut, IMutsel = mutation_analysis_guard(test, NFA_mut_guard, IMutsel)
+        cMut, IMutsel = mutation_analysis_guard(test, NFA_mut_guard, IMutsel, len(new_trans))
         if cMut:
             pre_tests.append(test)
             cMuts.append(cMut)
@@ -138,7 +168,7 @@ def mutant_generation_guard(hypothesis, system, Tests):
 
     return equivalent, ctx
 
-def mutation_analysis_guard(test, NMut, IMutsel):
+def mutation_analysis_guard(test, NMut, IMutsel, max_num):
     s0 = NMut.s_state
     Trans = NMut.trans
     #F_states = NMut.f_states
@@ -148,6 +178,8 @@ def mutation_analysis_guard(test, NMut, IMutsel):
 
     def tree_create(state, preTime, test_index):
         if test_index >= len(test):
+            return
+        if len(IMutsel) >= max_num:
             return
         time = test[test_index].time + preTime
         newTest = TimedWord(test[test_index].action, time)
@@ -196,43 +228,50 @@ def get_guardshift_trans(hypothesis, tran_id, next_trans):
                             temp_value.append(min + 0.1)
                     #temp_gurds.sort()
                     temp_value.sort()
-                    index = 0
+                    index1 = 0
                     #if len(temp_value) == 2:
                     #    new_guard = "[0," + str(random.randint(0, 20)) + "]"
-                    while index < len(temp_value):
-                        if int(temp_value[index]) == 0:
-                            index += 1
-                            if temp_value[index] == float("inf"):
+                    while index1 < len(temp_value):
+                        if index1 == 0 and int(temp_value[index1]) == 0:
+                            #index1 += 1
+                            if temp_value[index1 + 1] == float("inf"):
                                 temp_value[0] = random.randint(0, 10)
                                 temp_value[1] = random.randint(40, 60)
                                 break
+                            else:
+                                index1 += 1
                             continue
-
-                        if index == 0 and int(temp_value[index]) != 0:
+                        elif index1 == 0 and int(temp_value[index1]) != 0:
                             pre = 0
                         else:
-                            continue
-                        if index == len(temp_value) - 1 and temp_value[index] != float("inf"):
-                            suf = float("inf")
+                            pre = temp_value[index1 - 1]
+                        if index1 == len(temp_value) - 1 and temp_value[index1] != float("inf"):
+                            #suf = float("inf")
+                            suf = 500
+                        elif index1 == len(temp_value) - 1 and temp_value[index1] == float("inf"):
+                            #suf = 500
+                            temp_value[index1] = temp_value[index1 -1] + 100
+                            suf = temp_value[index1] + 100
                         else:
-                            suf = temp_value[index + 1]
+                            suf = temp_value[index1 + 1]
                         if coin_flip(0.5):
-                            shift_value = temp_value[index] - random.randint(0, int(temp_value[index] - pre))
+                            shift_value = temp_value[index1] - random.randint(0, int(temp_value[index1] - pre))
                         else:
-                            shift_value = temp_value[index] + random.randint(0, int(suf - temp_value[index]))
-                        temp_value[index] = shift_value
-                    index = 0
-                    while index < len(temp_value) - 1:
-                        if isinstance(temp_value[index], int):
-                            new_guard = "[" + str(temp_value[index]) + ","
+                            shift_value = temp_value[index1] + random.randint(0, int(suf - temp_value[index1]))
+                        temp_value[index1] = shift_value
+                        index1 += 1
+                    index2 = 0
+                    while index2 < len(temp_value) - 1:
+                        if isinstance(temp_value[index2], int):
+                            new_guard = "[" + str(temp_value[index2]) + ","
                         else:
-                            new_guard = "(" + str(round(temp_value[index])) + ","
-                        if isinstance(temp_value[index+1], int):
-                            new_guard += str(temp_value[index + 1]) + "]"
+                            new_guard = "(" + str(round(temp_value[index2])) + ","
+                        if isinstance(temp_value[index2 + 1], int):
+                            new_guard += str(temp_value[index2 + 1]) + "]"
                         else:
-                            new_guard += str(round(temp_value[index + 1])) + ")"
+                            new_guard += str(round(temp_value[index2 + 1])) + ")"
                         new_guards.append(Guard(new_guard))
-                        index += 1
+                        index2 += 1
                     new_trans.append(OTATran("new"+str(tran_id), tran.source, tran.action, new_guards, tran.reset, tran.target))
                     tran_id += 1
     return new_trans
