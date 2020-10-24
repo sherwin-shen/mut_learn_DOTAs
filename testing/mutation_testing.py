@@ -2,6 +2,8 @@ import random
 import queue
 import copy
 from common.TimedWord import TimedWord
+from common.TimeInterval import Guard
+from common.hypothesis import OTATran
 from testing.random_testing import test_generation_2
 
 
@@ -9,18 +11,19 @@ from testing.random_testing import test_generation_2
 
 def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
     # 生成候选测试集
-    test_num = len(hypothesisOTA.states)*len(hypothesisOTA.actions)*200
+    test_num = len(hypothesisOTA.states)*len(hypothesisOTA.states)*upper_guard*10
     tests = []
     pretry = 0.9
     pstop = 0.02
     linfix = int(len(hypothesisOTA.states) / 2)+1
-    max_steps = int(1.5 * len(hypothesisOTA.states))
+    max_steps = int(1.5 * state_num)
     for i in range(test_num):
         tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
+    print("lenth of tests:", len(tests))
 
     #状态数为1 特殊处理：
     if len(hypothesisOTA.states) == 1:
-        equivalent, ctx = test_execution(hypothesisOTA, system, tests)
+        equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests)
         return equivalent, ctx
 
 
@@ -28,7 +31,7 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
     Tsel = []
     cMuts = []
     IMutsel = []
-    nacc = 20
+    nacc = 10
     nsel = 100
     mutations = mutant_generation_split(hypothesisOTA, nacc)
     if len(mutations) > 0:
@@ -51,11 +54,12 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
     else:
         #raise Exception("Mutation Failed!")
         print("Mutation Failed!")
-        equivalent, ctx = test_execution(hypothesisOTA, system, tests)
+        equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests)
 
     # 测试执行
     if len(Tsel) > 0:
         equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
+
     #else:
         #raise Exception("Mutation Failed!")
     return equivalent, ctx
@@ -84,6 +88,7 @@ class NFAMut(object):
         self.trans = trans
         self.f_states = f_states
 
+'''
 class CoverATree_Node(object):
     def __init__(self,state,nodetime):
         self.state = state
@@ -92,31 +97,147 @@ class CoverATree_Node(object):
 
     def addNextStates(self,states):
         self.nextstates.append(states)
+'''
 
 
-def mutant_generation_guard(hypothesis):
-    Muts = []
+def mutant_generation_guard(hypothesis, system, Tests):
+    cMuts = []
+    IMutsel = []
     mId=0
+    #next_trans = list(len(hypothesis.states))
+    next_trans = {}
+    #pre_trans = list(len(hypothesis.states))
+    for state in hypothesis.states:
+        next_trans[state] = []
+
+    for tran in hypothesis.trans:
+        next_trans[tran.source].append(tran)
+        #pre_trans[int(tran.target)].append(tran)
+    tran_id = 0
+    new_trans = get_guardshift_trans(hypothesis, tran_id, next_trans)
+    NFA_mut_guard = NFAMut(hypothesis.states, hypothesis.init_state, hypothesis.actions, hypothesis.trans + new_trans, [])
+
+    print("lenth of guard new_trans:", len(new_trans))
+
+    pre_tests = []
+    Tsel = []
+    for test in Tests:
+        cMut, IMutsel = mutation_analysis_guard(test, NFA_mut_guard, IMutsel)
+        if cMut:
+            pre_tests.append(test)
+            cMuts.append(cMut)
+    if cMuts:
+        Tsel = test_selection(pre_tests, IMutsel, cMuts, 2000)  # 选择尽可能少的测试集覆盖cMuts里所包含的muts
+
+    print("lenth of guard cMuts:", len(cMuts))
+    print("lenth of guard IMutsel:", len(IMutsel))
+    print("lenth of guard pre_tests:", len(pre_tests))
+    if Tsel :
+        equivalent, ctx = test_execution(hypothesis, system, Tsel)
+    print("lenth of guard Tsel:", len(Tsel))
+
+    return equivalent, ctx
+
+def mutation_analysis_guard(test, NMut, IMutsel):
+    s0 = NMut.s_state
+    Trans = NMut.trans
+    #F_states = NMut.f_states
+    cMut = []
+    j = 0
+    nowTime = 0
+
+    def tree_create(state, preTime, test_index):
+        if test_index >= len(test):
+            return
+        time = test[test_index].time + preTime
+        newTest = TimedWord(test[test_index].action, time)
+
+        #if preTran.tran_id[0:3] == "new":
+        #    IMutsel.append(preTran.tran_id)
+
+        for tran in Trans:
+            if tran.source == state and tran.is_passing_tran(newTest):
+                if tran.reset:
+                    tempTime = 0
+                else:
+                    tempTime = time
+                #if tran.tran_id[0:3] == "new":
+                if isinstance(tran.tran_id, str):
+                    if tran.tran_id not in cMut:
+                        cMut.append(tran.tran_id)
+                    if tran.tran_id not in IMutsel:
+                        IMutsel.append(tran.tran_id)
+                tree_create(tran.target, tempTime, test_index + 1)
+    tree_create(s0, nowTime, j)
+    return cMut, IMutsel
+
+def get_guardshift_trans(hypothesis, tran_id, next_trans):
+    new_trans = []
     for q in hypothesis.states:
-        pre_action=[]
-        for tran in hypothesis.trans:
-            if tran.target == q and tran.target != tran.source:
-                pre_action.append(tran)
-        Ik = get_Ik(hypothesis, q)
-        for i in range(len(Ik))-1:
-            I1 = Ik[i]
-            j = i+1
-            while j < len(len(Ik)):
-                I2 = Ik[j]
-                if not(bool(I1[-1].target in hypothesis.accept_states) ^ bool(I2[-1].target in hypothesis.accept_states)):
-                    Mut1 = Mut(hypothesis, q, random.choice(pre_action), I1, mId)
-                    mId += 1
-                    Mut2 = Mut(hypothesis, q, random.choice(pre_action), I2, mId)
-                    mId += 1
+        for tran in next_trans[q]:
+            for action in hypothesis.actions:
+                new_guards = []
+                if tran.action == action:
+                    temp_value = []
+                    temp_gurds = []
+                    for guard in tran.guards:
+                        max = guard.get_max()
+                        min = guard.get_min()
+                        temp_gurds.append(max)
+                        temp_gurds.append(min)
+                        #shift = random.randint()
+                        if guard.get_closed_max():
+                            temp_value.append(int(max))
+                        else:
+                            temp_value.append(max - 0.1)
+                        if guard.get_closed_max():
+                            temp_value.append(int(min))
+                        else:
+                            temp_value.append(min + 0.1)
+                    #temp_gurds.sort()
+                    temp_value.sort()
+                    index = 0
+                    #if len(temp_value) == 2:
+                    #    new_guard = "[0," + str(random.randint(0, 20)) + "]"
+                    while index < len(temp_value):
+                        if int(temp_value[index]) == 0:
+                            index += 1
+                            if temp_value[index] == float("inf"):
+                                temp_value[0] = random.randint(0, 10)
+                                temp_value[1] = random.randint(40, 60)
+                                break
+                            continue
+
+                        if index == 0 and int(temp_value[index]) != 0:
+                            pre = 0
+                        else:
+                            continue
+                        if index == len(temp_value) - 1 and temp_value[index] != float("inf"):
+                            suf = float("inf")
+                        else:
+                            suf = temp_value[index + 1]
+                        if coin_flip(0.5):
+                            shift_value = temp_value[index] - random.randint(0, int(temp_value[index] - pre))
+                        else:
+                            shift_value = temp_value[index] + random.randint(0, int(suf - temp_value[index]))
+                        temp_value[index] = shift_value
+                    index = 0
+                    while index < len(temp_value) - 1:
+                        if isinstance(temp_value[index], int):
+                            new_guard = "[" + str(temp_value[index]) + ","
+                        else:
+                            new_guard = "(" + str(round(temp_value[index])) + ","
+                        if isinstance(temp_value[index+1], int):
+                            new_guard += str(temp_value[index + 1]) + "]"
+                        else:
+                            new_guard += str(round(temp_value[index + 1])) + ")"
+                        new_guards.append(Guard(new_guard))
+                        index += 1
+                    new_trans.append(OTATran("new"+str(tran_id), tran.source, tran.action, new_guards, tran.reset, tran.target))
+                    tran_id += 1
+    return new_trans
 
 
-
-    return
 
 def mutant_generation_split(hypothesis, nacc):
     Muts = []
@@ -124,7 +245,7 @@ def mutant_generation_split(hypothesis, nacc):
 
     for q in hypothesis.states:
         set_accq = get_all_acc(hypothesis, q)
-        if len(set_accq) <= 2:
+        if len(set_accq) < 2:
             continue
         elif nacc >= len(set_accq):
             subset_accq = set_accq
@@ -206,7 +327,7 @@ def NFA_mutant(hypothesis, IMut):
     NMut = NFAMut(S, [hypothesis.init_state], hypothesis.actions, T, F)
     return NMut
 
-
+'''
 def mutation_analysis1(test, NMut,IMutsel):  #abandon 弃用
     s0 = NMut.s_state
     T = NMut.trans
@@ -271,10 +392,40 @@ def mutation_analysis1(test, NMut,IMutsel):  #abandon 弃用
         state = next
         j += 1
     return cMut, IMutsel
-
-
+'''
 
 def mutation_analysis(test, NMut, IMutsel):
+    s0 = NMut.s_state
+    Trans = NMut.trans
+    F_states = NMut.f_states
+    cMut = []
+    j = 0
+    nowTime = 0
+
+    def tree_create(state, preTime, test_index):
+        if test_index >= len(test):
+            return
+        time = test[test_index].time + preTime
+        newTest = TimedWord(test[test_index].action, time)
+
+        if len(state) == 2:
+            if state in F_states and (state[1] not in cMut):
+                cMut.append(state[1])
+                if state[1] not in IMutsel:
+                    IMutsel.append(state[1])
+
+        for tran in Trans:
+            if tran[0] == state and tran[1].is_passing_tran(newTest):
+                if tran[1].reset:
+                    tempTime = 0
+                else:
+                    tempTime = time
+                tree_create(tran[2], tempTime, test_index + 1)
+    tree_create(s0, nowTime, j)
+    return cMut, IMutsel
+
+'''
+def mutation_analysis1(test, NMut, IMutsel):
     s0 = NMut.s_state
     T = NMut.trans
     F = NMut.f_states
@@ -284,6 +435,7 @@ def mutation_analysis(test, NMut, IMutsel):
     tree = tree_create(s0, nowTime, T, F, cMut, IMutsel, test, j)
 
     return cMut, IMutsel
+'''
 
 
 def test_selection(Tests, C, Cset, nsel): #C:all mutations; Cset:cover mutation set
@@ -373,6 +525,7 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
                 next_to_explore.put([sn, path1.append(temp_DTW)])
     return None, init_now_time
 
+'''
 def tree_create(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index):
     nowNode = CoverATree_Node(state, preTime)
 
@@ -396,7 +549,7 @@ def tree_create(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index
 
             childNode = tree_create(tran[2], tempTime, Trans, F_states, cMut, IMutsel, Test, test_index+1)
             nowNode.addNextStates(childNode)
-
+'''
 '''
 def get_next_tran(hypothesis, sn, s2, paths, max_path_length, max_paths_num, tran):
     #next_tran = None
@@ -436,7 +589,7 @@ def get_all_acc(hypothesis, s2):
 
     def get_next_tran(sn, path):
         if sn == s2 and path:
-            if path not in paths and len(path) > 2:
+            if path not in paths:
                 paths.append(path)
             return
         if len(path) > max_path_length:
@@ -453,78 +606,6 @@ def get_all_acc(hypothesis, s2):
 
 # get mutated access seq leading to a single state
 
-
-def get_all_acc2(hypothesis, s2):
-    s1 = hypothesis.init_state
-    next_to_explore = queue.Queue()
-    next_to_explore.put([s1, []])
-    paths = []
-    visited=[]
-    num = 0
-    max_num = 2000
-    max_path_length = int(len(hypothesis.states)*2.5)
-    max_paths_num=int(len(hypothesis.states)*len(hypothesis.actions))*2
-
-    while num < max_num and len(paths) < max_paths_num:
-        next_to_explore = queue.Queue()
-        next_to_explore.put([s1, []])
-        visited = []
-        while not next_to_explore.empty() and num < max_num and len(paths) < max_paths_num:
-            [sc, path] = next_to_explore.get()
-            if path is None:
-                path = []
-            if sc not in visited:
-                visited.append(sc)
-                for ts in hypothesis.trans:
-                    sn = None
-                    if ts.source == sc:
-                        sn = ts.target
-                    path.append(ts)
-                    break
-                if sn == s2:
-                    paths.append(copy.deepcopy(path))
-                    break
-                    #return path, now_time
-                if len(path) >= max_path_length:
-                    sn = s1
-                    break
-                else:
-                    next_to_explore.put([sn, copy.deepcopy(path)])
-    return paths
-
-def get_all_acc1(hypothesis, s2):
-    s1 = hypothesis.init_state
-    next_to_explore = queue.Queue()
-    next_to_explore.put([s1, []])
-    paths = []
-    num = 0
-    max_num = 2000
-    max_path_length = int(len(hypothesis.states)*2.5)
-    max_paths_num=int(len(hypothesis.states)*len(hypothesis.actions))*2
-
-    while not next_to_explore.empty() and num < max_num and len(paths) < max_paths_num:
-        [sc, path] = next_to_explore.get()
-        if path is None:
-            path = []
-        for tran in hypothesis.trans:
-            sn = sc
-            if tran.source == sc:
-                sn = tran.target
-            if sn == s2:
-                path.append(tran)
-                if path not in paths:
-                    print([[i.source, i.target] for i in path])
-                    num += 1
-                    paths.append(copy.deepcopy(path))
-                path.pop()
-                break
-            path.append(tran)
-            if len(path) >= max_path_length:
-                break
-            else:
-                next_to_explore.put([sn, copy.deepcopy(path)])
-                path.pop()
-    return paths
 
 
 def mut_split(s1, s2, hypothesis, mId):
@@ -613,7 +694,11 @@ def get_blocked(s, blocked):
             b.append(bb)
     return b
 
-def tree_create(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index):
+def coin_flip(p):
+    return random.random() <= p
+
+'''
+def tree_create1(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index):
     nowNode = CoverATree_Node(state, preTime)
 
     if test_index>=len(Test):
@@ -636,7 +721,7 @@ def tree_create(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index
 
             childNode = tree_create(tran[2], tempTime, Trans, F_states, cMut, IMutsel, Test, test_index+1)
             nowNode.addNextStates(childNode)
-
+'''
 
 if __name__ == '__main__':
     import json
