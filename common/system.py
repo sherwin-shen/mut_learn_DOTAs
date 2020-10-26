@@ -14,10 +14,17 @@ class System(object):
         self.mq_num = 0
         self.eq_num = 0
         self.test_num = 0
+        self.test_num_cache = 0
+        self.cache = {}
 
     # Perform tests(DTWs) on the system, return value and DRTWs(full)
     def test_DTWs(self, DTWs):
         self.test_num += 1
+        temp_DTWs = tuple(DTWs)
+        if temp_DTWs in self.cache:
+            return self.cache[temp_DTWs][0], self.cache[temp_DTWs][1]
+        else:
+            self.test_num_cache += 1
         DRTWs = []
         now_time = 0
         cur_state = self.init_state
@@ -46,6 +53,7 @@ class System(object):
             value = 1
         else:
             value = 0
+        self.cache[temp_DTWs] = [DRTWs, value]
         return DRTWs, value
 
     # Perform tests(LTWs) on the system(smart teacher), return value and LRTWs

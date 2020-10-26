@@ -34,7 +34,7 @@ class NFAMut(object):
 def mutation_testing_1(hypothesisOTA, state_num, upper_guard, system):
     # 参数配置
     hypothesisOTA = hypothesisOTA.build_simple_hypothesis()
-    test_num = len(hypothesisOTA.states) * len(hypothesisOTA.actions) * 200
+    test_num = len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10
     pretry = 0.9
     pstop = 0.02
     linfix = math.ceil(len(hypothesisOTA.states) / 2)
@@ -173,8 +173,8 @@ def mutation_analysis(test, NMut, IMutsel, NFA_mut_tran_dict):
     def tree_create(state, preTime, test_index):
         if test_index >= len(test):
             return True
-        time = test[test_index].time + preTime
-        new_LTW = TimedWord(test[test_index].action, time)
+        cur_time = test[test_index].time + preTime
+        new_LTW = TimedWord(test[test_index].action, cur_time)
         if len(state) == 2:
             if state in F_states and (state[1] not in cMut):
                 cMut.append(state[1])
@@ -188,7 +188,7 @@ def mutation_analysis(test, NMut, IMutsel, NFA_mut_tran_dict):
                 if tran[1].reset:
                     tempTime = 0
                 else:
-                    tempTime = time
+                    tempTime = cur_time
                 tree_create(tran[2], tempTime, test_index + 1)
         return True
 

@@ -8,7 +8,7 @@ from common.TimedWord import TimedWord
 
 # 随机测试算法1 - 完全随机采样
 def random_testing_1(hypothesis, upper_guard, state_num, system):
-    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 20
+    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10
 
     ctx = None
     for i in range(test_num):
@@ -36,21 +36,21 @@ def test_generation_1(actions, upper_guard, state_num):
 
 # 随机测试算法2 - 源自：Efficient Active Automata Learning via Mutation Testing
 def random_testing_2(hypothesis, upper_guard, state_num, system):
-    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 20
+    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10
     pretry = 0.9
     pstop = 0.02
-    linfix = math.ceil(state_num / 2)
+    linfix = math.ceil(len(hypothesis.states) / 2)
     max_steps = int(1.5 * state_num)
 
     ctx = None
     for i in range(test_num):
         test = test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
-        flag = test_execution(hypothesis, system, test)
-        if flag:
-            ctx = test
-            break
-    if ctx is not None:
-        return False, ctx
+        test_list = prefixes(test)
+        for j in test_list:
+            flag = test_execution(hypothesis, system, j)
+            if flag:
+                ctx = test
+                return False, ctx
     return True, ctx
 
 
@@ -126,7 +126,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
 
 # 随机测试算法3 - 源自：Active Model Learning of Timed Automata via Genetic Programming
 def random_testing_3(hypothesis, upper_guard, state_num, system):
-    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 20
+    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10
     n_len = int(state_num * 1.5)
     p_valid = 0.9
     p_delay = 0.6
@@ -134,12 +134,12 @@ def random_testing_3(hypothesis, upper_guard, state_num, system):
     ctx = None
     for i in range(test_num):
         test = test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard)
-        flag = test_execution(hypothesis, system, test)
-        if flag:
-            ctx = test
-            break
-    if ctx is not None:
-        return False, ctx
+        test_list = prefixes(test)
+        for j in test_list:
+            flag = test_execution(hypothesis, system, j)
+            if flag:
+                ctx = test
+                return False, ctx
     return True, ctx
 
 
@@ -268,3 +268,12 @@ def get_delay_list(transition_list):
                 if right[0] != '+':
                     delay_list.append(guard.get_max() - 0.5)
     return delay_list
+
+
+# prefix set of tws （tws前缀集）
+def prefixes(tws):
+    new_prefixes = []
+    for i in range(1, len(tws) + 1):
+        temp_tws = tws[:i]
+        new_prefixes.append(temp_tws)
+    return new_prefixes

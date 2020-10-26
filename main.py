@@ -27,7 +27,7 @@ def main():
     start_time = time.time()
     print("********** learning starting *************")
     if teacher_type == "smart_teacher":
-        learned_system, mq_num, eq_num, test_num, table_num = learnOTA_smart(system, actions, upper_guard, state_num, debug_flag)
+        learned_system, mq_num, eq_num, test_num, test_num_cache, table_num = learnOTA_smart(system, actions, upper_guard, state_num, debug_flag)
     elif teacher_type == "normal_teacher":
         raise Exception('暂不支持 normal_teacher！')
     else:
@@ -49,6 +49,7 @@ def main():
         print("Total number of MQs (no-cache): " + str(mq_num))
         print("Total number of EQs (no-cache): " + str(eq_num))
         print("Total number of tests (no-cache): " + str(test_num))
+        print("Total number of tests (with-cache): " + str(test_num_cache))
         print("Total number of tables explored (no-cache): " + str(table_num))
         print("Completely correct: " + str(correct_flag) + "   Testing pass rate: " + str(passing_rate))
         print("*********** learning ending  *************")
@@ -61,6 +62,7 @@ def main():
             "mqNum": mq_num,
             "eqNum": eq_num,
             "testNum": test_num,
+            "testNumCache": test_num_cache,
             "tableNum": table_num,
             "correct": correct_flag,
             "passingRate": passing_rate,

@@ -12,6 +12,9 @@ class TimedWord(object):
     def __lt__(self, other):
         return (self.time, self.action) < (other.time, other.action)
 
+    def __hash__(self):
+        return hash(("TW", self.action, self.time))
+
     def show(self):
         return "(" + self.action + "," + str(self.time) + ")"
 

@@ -71,4 +71,4 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
         else:
             learned_system = copy.deepcopy(hypothesisOTA).build_simple_hypothesis()
 
-    return learned_system, system.mq_num, system.eq_num, system.test_num, table_num
+    return learned_system, system.mq_num, system.eq_num, system.test_num, system.test_num_cache, table_num
