@@ -26,7 +26,7 @@ def EQs(hypothesisOTA, upper_guard, state_num, system):
     # equivalent, ctx = random_testing_3(hypothesisOTA, upper_guard, state_num, system)
 
     # 测试5 - 随机测试结合变异测试
-    equivalent, ctx = mutation_testing_1(hypothesisOTA, upper_guard, system)
+    equivalent, ctx = mutation_testing_1(hypothesisOTA, state_num, upper_guard, system)
 
     if ctx is not None:
         ctx = minimize_counterexample(hypothesisOTA, system, ctx)
