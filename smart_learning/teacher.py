@@ -13,6 +13,7 @@ def TQs(LTWs, system):
 
 
 def EQs(hypothesisOTA, upper_guard, state_num, system, hp_num):
+    hypothesisOTA_simple = struct_simpleHypothesis(hypothesisOTA)
     # # 测试1 - pac testing
     # equivalent, ctx = pac_testing(hypothesisOTA, upper_guard, state_num, system)
 
@@ -23,10 +24,10 @@ def EQs(hypothesisOTA, upper_guard, state_num, system, hp_num):
     # equivalent, ctx = random_testing_2(hypothesisOTA, upper_guard, state_num, system)
 
     # # 测试4 - 随机游走测试
-    # equivalent, ctx = random_testing_3(hypothesisOTA, upper_guard, state_num, system)
+    #equivalent, ctx = random_testing_3(hypothesisOTA_simple, upper_guard, state_num, system)
 
     # 测试5 - 随机测试结合变异测试
-    hypothesisOTA_simple = struct_simpleHypothesis(hypothesisOTA)
+
     make_full_hypothesis(hypothesisOTA_simple, 'results/test/', 'learned_OTA_' + str(hp_num))
 
 

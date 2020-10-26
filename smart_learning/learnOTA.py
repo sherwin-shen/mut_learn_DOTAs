@@ -75,5 +75,8 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
                 table.show()
         else:
             learned_system = copy.deepcopy(hypothesisOTA).build_simple_hypothesis()
+            for e in table.E:
+                if len(e) > 1:
+                    raise Exception("E len > 1")
 
     return learned_system, system.mq_num, system.eq_num, system.test_num, table_num
