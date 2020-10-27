@@ -210,12 +210,10 @@ def mutation_analysis_guard(test, NMut, IMutsel, max_num):
 
 def get_guardshift_trans(hypothesis, tran_id, next_trans, upper_guard):
     new_trans = []
+    mut_times =2
     for q in hypothesis.states:
         for tran in next_trans[q]:
-            for action in hypothesis.actions:
-                new_guards = []
-                if tran.action == action:
-                    temp_value = []
+                    new_guards = []
                     temp_gurds = []
                     for guard in tran.guards:
                         max = guard.get_max()
@@ -223,70 +221,71 @@ def get_guardshift_trans(hypothesis, tran_id, next_trans, upper_guard):
                         #temp_gurds.append(max)
                         #temp_gurds.append(min)
                         #shift = random.randint()
-                        if guard.get_closed_max():
-                            temp_gurds.append(int(max))
-                        else:
-                            temp_gurds.append(max - 0.1)
-                        if guard.get_closed_min():
-                            temp_gurds.append(int(min))
-                        else:
-                            temp_gurds.append(min + 0.1)
+                        temp_gurds.append(max)
+                        temp_gurds.append(min)
+                        #if guard.get_closed_max():
+                        #    temp_gurds.append(int(max))
+                        #else:
+                        #    temp_gurds.append(max - 0.1)
+                        #if guard.get_closed_min():
+                        #    temp_gurds.append(int(min))
+                        #else:
+                        #    temp_gurds.append(min + 0.1)
                     temp_gurds.sort()
                     temp_value = copy.deepcopy(temp_gurds)
 
-                    for i in range(2):
+                    for i in range(mut_times):
                         index1 = 0
                         while index1 < len(temp_value):
-                            if index1 == 0 and int(temp_value[index1]) == 0:
+                            if index1 == 0 and int(temp_gurds[index1]) == 0:
                                 #index1 += 1
-                                if temp_value[index1 + 1] == float("inf"):
+                                if index1 + 1 == len(temp_gurds)-1 and temp_gurds[index1 + 1] == float("inf"):
                                     if coin_flip(0.5):
                                         temp_value[0] = random.randint(0, upper_guard)
                                     else:
                                         temp_value[1] = random.randint(1, upper_guard)
                                     break
+                                elif index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] != float("inf"):
+                                    temp_value[index1+1] = random.randint(1, upper_guard)
+                                    break
                                 else:
-                                    index1 += 1
+                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 2])
+                                    index1 += 2
                                 continue
-                            elif index1 == 0 and int(temp_value[index1]) != 0:
-                                pre = 0
-                            else:
-                                pre = temp_value[index1 - 1]
-                            if index1 == len(temp_value) - 1 and temp_value[index1] != float("inf"):
-                                #suf = float("inf")
-                                suf = temp_value[index1] + upper_guard
-                            elif index1 == len(temp_value) - 1 and temp_value[index1] == float("inf"):
-                                index1 += 1
-                                continue
-                                #suf = 500
-                                #temp_value[index1] = temp_value[index1 -1] + 100
-                                #suf = temp_value[index1] + 100
-                            else:
-                                if temp_value[index1 + 1] == float("inf"):
-                                    suf = temp_value[index1] + upper_guard
+                            elif index1 == 0 and int(temp_gurds[index1]) != 0:
+                                if index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] == float("inf"):
+                                    temp_value[index1] = random.randint(0, temp_gurds[index1] + upper_guard)
+                                    break
+                                elif index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] != float("inf"):
+                                    temp_value[index1] = random.randint(0, temp_gurds[index1 + 1])
+                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 1] + upper_guard)
+                                    break
                                 else:
-                                    suf = temp_value[index1 + 1]
-                            if coin_flip(0.5):
-                                shift_value = temp_value[index1] - random.randint(0, int(temp_value[index1] - pre))
+                                    temp_value[index1] = random.randint(0, temp_gurds[index1 + 1])
+                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 2])
+                                    index1 += 2
+                                    continue
                             else:
-                                shift_value = temp_value[index1] + random.randint(0, int(suf - temp_value[index1]))
-                            temp_value[index1] = shift_value
-                            index1 += 1
+                                if index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] == float("inf"):
+                                    temp_value[index1] = random.randint(temp_gurds[index1 - 1], temp_gurds[index1] + upper_guard)
+                                    break
+                                elif index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] != float("inf"):
+                                    temp_value[index1] = random.randint(temp_gurds[index1 - 1], temp_gurds[index1 + 1])
+                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 1] + upper_guard)
+                                    break
+                                else:
+                                    temp_value[index1] = random.randint(temp_gurds[index1 - 1], temp_gurds[index1 + 1])
+                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 2])
+                                    index1 += 2
+                                    continue
                         index2 = 0
-                        while index2 < len(temp_value) - 1:
-                            if isinstance(temp_value[index2], int):
-                                new_guard = "[" + str(temp_value[index2]) + ","
+                        while index2 < len(temp_value) :
+                            if temp_value[index2 + 1] == float("inf"):
+                                new_guard = "[" + str(temp_value[index2]) + ",+)"
                             else:
-                                new_guard = "(" + str(round(temp_value[index2])) + ","
-                            if isinstance(temp_value[index2 + 1], int):
-                                new_guard += str(temp_value[index2 + 1]) + "]"
-                            else:
-                                if temp_value[index2 + 1] == float("inf"):
-                                    new_guard += "+)"
-                                else:
-                                    new_guard += str(round(temp_value[index2 + 1])) + ")"
+                                new_guard = "[" + str(temp_value[index2]) + "," + str(temp_value[index2 + 1]) + ")"
                             new_guards.append(Guard(new_guard))
-                            index2 += 1
+                            index2 += 2
                         new_trans.append(OTATran("new"+str(tran_id), tran.source, tran.action, new_guards, tran.reset, tran.target))
                         tran_id += 1
     return new_trans
@@ -674,7 +673,7 @@ def mut_split(s1, s2, hypothesis, mId):
         return None, mId
     pI = ss1[len(ss1) - 1]
     Mutants = list()
-    Ik = get_Ik(hypothesis, s1[-1].target, 2)
+    Ik = get_Ik(hypothesis, s1[-1].target, 1)
     for distSeq in Ik:
         H = hypothesis
         qpre = pI.source
