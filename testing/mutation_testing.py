@@ -50,6 +50,12 @@ def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
         print("lenth of pre_tests:", len(pre_tests))
     if cMuts:
         Tsel = test_selection(pre_tests, IMutsel, cMuts, 2000)  # 选择尽可能少的测试集覆盖cMuts里所包含的muts
+
+        for test in Tsel:
+            for i in range(len(test)-1):
+                if test[0 : i+1] not in Tsel:
+                    Tsel.append(test[0 : i+1])
+
         equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
         print("lenth of Tsel:", len(Tsel))
     else:
@@ -84,11 +90,7 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
 
 
     # 生成变异体及变异分析
-    Tsel = []
-    cMuts = []
-    IMutsel = []
-    nacc = 10
-    nsel = 100
+
     equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests, upper_guard)
 
     #else:
@@ -164,8 +166,14 @@ def mutant_generation_guard(hypothesis, system, Tests, upper_guard):
     print("lenth of guard IMutsel:", len(IMutsel))
     print("lenth of guard pre_tests:", len(pre_tests))
     if Tsel :
+        for test in Tsel:
+            for i in range(len(test) - 1):
+                if test[0: i + 1] not in Tsel:
+                    Tsel.append(test[0: i + 1])
+
+        #equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
         equivalent, ctx = test_execution(hypothesis, system, Tsel)
-    print("lenth of guard Tsel:", len(Tsel))
+        print("lenth of guard Tsel:", len(Tsel))
 
     return equivalent, ctx
 
@@ -219,7 +227,7 @@ def get_guardshift_trans(hypothesis, tran_id, next_trans, upper_guard):
                             temp_gurds.append(int(max))
                         else:
                             temp_gurds.append(max - 0.1)
-                        if guard.get_closed_max():
+                        if guard.get_closed_min():
                             temp_gurds.append(int(min))
                         else:
                             temp_gurds.append(min + 0.1)
