@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     ### file directory
     # file_path = sys.argv[1]
-    file_path = "benchmarks/3_2_10/3_2_10-2"
+    file_path = "benchmarks/4_2_10/4_2_10-3"
     # target model file
     model_file = file_path + "/model.json"
     # prior information required for learning

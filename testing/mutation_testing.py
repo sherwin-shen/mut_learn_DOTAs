@@ -3,6 +3,7 @@ import copy
 import math
 from common.TimedWord import TimedWord
 from testing.random_testing import test_generation_2
+import time
 
 
 class Mut(object):
@@ -37,7 +38,7 @@ def mutation_testing_1(hypothesisOTA, state_num, upper_guard, system):
     test_num = len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10
     pretry = 0.9
     pstop = 0.02
-    linfix = math.ceil(len(hypothesisOTA.states) / 2)
+    linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
     max_steps = int(1.5 * state_num)
 
     # 生成候选测试集
@@ -52,7 +53,7 @@ def mutation_testing_1(hypothesisOTA, state_num, upper_guard, system):
 
     # 生成变异体
     nacc = 10
-    mutations = mutant_generation_state(hypothesisOTA, nacc)
+    mutations = mutant_generation_state(hypothesisOTA, nacc, state_num)
 
     # 变异分析生成测试集
     Tsel = []  # mutation所筛选出来的测试集
@@ -62,18 +63,25 @@ def mutation_testing_1(hypothesisOTA, state_num, upper_guard, system):
         # IMut_sample = mutant_sample(hypothesisOTA.states, mutations)
         IMut_sample = mutations
         NFA_mut = NFA_mutant(hypothesisOTA, IMut_sample)  # 生成包含muts信息的NFA
+        print('tran_num', len(NFA_mut.trans), 'state_num', len(hypothesisOTA.states))
         NFA_mut_tran_dict = get_tran_dict(NFA_mut)
         # 找到test覆盖的muts，以下数组一一对应
         pre_tests = []
         cMuts = []
         IMutsel = []
+        time1 = time.time()
         for test in tests:
             cMut, IMutsel = mutation_analysis(test, NFA_mut, IMutsel, NFA_mut_tran_dict)
             if cMut:
                 pre_tests.append(test)
                 cMuts.append(cMut)
+        time2 = time.time()
+        print('mutation_analysis', time2 - time1)
         if cMuts:
+            time3 = time.time()
             Tsel = test_selection(pre_tests, IMutsel, cMuts, nsel)
+            time4 = time.time()
+            print('test_selection', time4 - time3)
     else:
         # raise Exception("Mutation Failed!")
         Tsel = tests
@@ -100,11 +108,11 @@ def get_tran_dict(NFA_mut):
 
 
 # 根据状态分裂来生成
-def mutant_generation_state(hypothesis, nacc):
+def mutant_generation_state(hypothesis, nacc, state_num):
     Muts = []
     mId = 0
     for state in hypothesis.states:
-        set_accq = get_all_acc(hypothesis, state)
+        set_accq = get_all_acc(hypothesis, state, state_num)
         if len(set_accq) < 2:
             continue
         elif nacc >= len(set_accq):
@@ -203,29 +211,28 @@ def test_selection(Tests, C, Cset, nsel):
     CC = copy.deepcopy(C)
     tests = copy.deepcopy(Tests)
     cset = copy.deepcopy(Cset)
+
+    pre_set = []
     while len(Tsel) < nsel and CC:
-        index, topt = arg_min(tests, CC, cset)
-        Ctopt = cset[index]
-        if not Ctopt:
+        cur_index = 0
+        cur_max = []
+        for i in range(len(cset)):
+            cset[i] = list(set(cset[i]).difference(set(pre_set)))
+            if len(cur_max) < len(cset[i]):
+                cur_max = cset[i]
+                cur_index = i
+        if cur_max:
+            Tsel.append(tests[cur_index])
+            pre_set = cur_max
+        else:
             break
-        intersectionEmpty = True
-        for c in Ctopt:
-            if c in CC:
-                intersectionEmpty = False
-                break
-        if intersectionEmpty:
-            break
-        Tsel.append(topt)
-        for c in Ctopt:
-            if c in CC:
-                CC.remove(c)
     return Tsel
 
 
 # get mutated access seq leading to a single state
-def get_all_acc(hypothesis, state):
+def get_all_acc(hypothesis, state, state_num):
     paths = []
-    max_path_length = int(len(hypothesis.states) * 2.5)
+    max_path_length = min(int(len(hypothesis.states) * 1.5), state_num * 1.5)
 
     def get_next_tran(sn, path):
         if len(path) > max_path_length:
@@ -258,7 +265,7 @@ def mut_split(s1, s2, hypothesis, mId):
         return None, mId
     pI = ss1[len(ss1) - 1]
     Mutants = list()
-    step = 2
+    step = 1
     Ik = get_Ik(hypothesis, s1[-1].target, step)
     for distSeq in Ik:
         H = hypothesis

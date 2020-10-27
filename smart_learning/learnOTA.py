@@ -62,6 +62,8 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
             if debug_flag:
                 print("***************** counterexample is as follow. *******************")
                 print([dtw.show() for dtw in ctx])
+            print("***************** counterexample is as follow. *******************")
+            print([dtw.show() for dtw in ctx])
             # deal with ctx
             table = obsTable.deal_ctx(table, ctx, system)
             table_num = table_num + 1
