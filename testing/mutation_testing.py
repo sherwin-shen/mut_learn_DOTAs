@@ -138,16 +138,16 @@ def mutant_generation_guard(hypothesis, system, Tests, upper_guard):
     IMutsel = []
     mId=0
     #next_trans = list(len(hypothesis.states))
-    next_trans = {}
+    #next_trans = {}
     #pre_trans = list(len(hypothesis.states))
-    for state in hypothesis.states:
-        next_trans[state] = []
+    #for state in hypothesis.states:
+    #    next_trans[state] = []
 
-    for tran in hypothesis.trans:
-        next_trans[tran.source].append(tran)
+    #for tran in hypothesis.trans:
+    #    next_trans[tran.source].append(tran)
         #pre_trans[int(tran.target)].append(tran)
     tran_id = 0
-    new_trans = get_guardshift_trans(hypothesis, tran_id, next_trans, upper_guard)
+    new_trans = get_guardshift_trans(hypothesis, "widen", upper_guard)
     NFA_mut_guard = NFAMut(hypothesis.states, hypothesis.init_state, hypothesis.actions, hypothesis.trans + new_trans, [])
 
     print("lenth of guard new_trans:", len(new_trans))
@@ -185,13 +185,18 @@ def mutation_analysis_guard(test, NMut, IMutsel, max_num):
     j = 0
     nowTime = 0
 
-    def tree_create(state, preTime, test_index):
+    def tree_create(state, ntran, preTime, test_index):
         if test_index >= len(test):
-            return
-        if len(IMutsel) >= max_num:
             return
         time = test[test_index].time + preTime
         newTest = TimedWord(test[test_index].action, time)
+
+        if ntran and isinstance(ntran.tran_id, str):
+            if ntran.tran_id not in cMut:
+                cMut.append(ntran.tran_id)
+            if ntran.tran_id not in IMutsel:
+                IMutsel.append(ntran.tran_id)
+
         for tran in Trans:
             if tran.source == state and tran.is_passing_tran(newTest):
                 if tran.reset:
@@ -199,13 +204,8 @@ def mutation_analysis_guard(test, NMut, IMutsel, max_num):
                 else:
                     tempTime = time
                 #if tran.tran_id[0:3] == "new":
-                if isinstance(tran.tran_id, str):
-                    if tran.tran_id not in cMut:
-                        cMut.append(tran.tran_id)
-                    if tran.tran_id not in IMutsel:
-                        IMutsel.append(tran.tran_id)
-                tree_create(tran.target, tempTime, test_index + 1)
-    tree_create(s0, nowTime, j)
+                tree_create(tran.target, tran, tempTime, test_index + 1)
+    tree_create(s0, [], nowTime, j)
     return cMut, IMutsel
 
 def get_guardshift_trans1(hypothesis, tran_id, next_trans, upper_guard):
@@ -519,16 +519,14 @@ def get_guardshift_trans(hypothesis, operator_type, upper_guard):
     new_trans=[]
 
     if operator_type == "restrict":
-        new_trans.append(guard_restrict_opetator(hypothesis, upper_guard))
+        new_trans.extend(guard_restrict_opetator(hypothesis, upper_guard))
     elif operator_type == "widen":
-        new_trans.append(guard_widen_operator(hypothesis, upper_guard))
+        new_trans.extend(guard_widen_operator(hypothesis, upper_guard, 2))
     else:
-        return new_trans
+        return []
     return new_trans
 
 def guard_restrict_opetator(hypothesis, upper_guard):
-
-
     return
 
 def guard_widen_operator(hypothesis, upper_guard, times):
@@ -538,20 +536,55 @@ def guard_widen_operator(hypothesis, upper_guard, times):
         for guard in tran.guards:
             min = guard.get_min()
             max = guard.get_max()
-            if min == 0 and max == float("inf"):
-                gvalue = random.randint(0, upper_guard)
-                for state in hypothesis.states:
-                    new_trans.append(OTATran("new" + str(tranId), tran.source, tran.action, Guard(["[0," + str(gvalue) + ")"]), tran.reset, state))
-                    new_trans.append(OTATran("new" + str(tranId), tran.source, tran.action, Guard(["(" + str(gvalue) + ",+)"]), tran.reset, state))
 
-            if min > 0:
-                min -= random.randint(1,upper_guard-1)
+            if min == 0 and max == float("inf"):
+                for i in range(times):
+                    gvalue = random.randint(0, upper_guard)
+                    for state in hypothesis.states:
+                        if coin_flip(0.5):
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[0," + str(gvalue) + ")")],
+                                        tran.reset, state))
+                            tranId += 1
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[" + str(gvalue) + ",+)")],
+                                        tran.reset, state))
+                            tranId += 1
+                        else:
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("(" + str(gvalue) + ",+)")],
+                                        tran.reset, state))
+                            tranId += 1
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[0," + str(gvalue) + "]")],
+                                        tran.reset, state))
+                            tranId += 1
+                continue
+
+            for i in range(times):
+                min -= random.randint(1, upper_guard-1)
                 if min < 0:
                     min = 0
-            if max != float("inf"):
-                max += random.randint(1,upper_guard-1)
-
-    return
+                if max != float("inf"):
+                    max += random.randint(1, upper_guard-1)
+                    if coin_flip(0.5):
+                        if coin_flip(0.5):
+                            new_guard = Guard("(" + str(min) + "," + str(max) + ")")
+                        else:
+                            new_guard = Guard("(" + str(min) + "," + str(max) + "]")
+                    else:
+                        if coin_flip(0.5):
+                            new_guard = Guard("[" + str(min) + "," + str(max) + ")")
+                        else:
+                            new_guard = Guard("[" + str(min) + "," + str(max) + "]")
+                else:
+                    if coin_flip(0.5):
+                        new_guard = Guard("(" + str(min) + ",+)")
+                    else:
+                        new_guard = Guard("[" + str(min) + ",+)")
+                new_trans.append(OTATran("new" + str(tranId), tran.source, tran.action, [new_guard], tran.reset, tran.target))
+                tranId += 1
+    return new_trans
 
 
 # --------------------------------- 算法2 - mutation testing用于测试集生成 ---------------------------------
@@ -786,8 +819,6 @@ def get_blocked(s, blocked):
             b.append(bb)
     return b
 
-def coin_flip(p):
-    return random.random() <= p
 
 '''
 def tree_create1(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index):
