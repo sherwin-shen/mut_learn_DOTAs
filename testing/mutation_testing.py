@@ -3,7 +3,6 @@ import copy
 import math
 from common.TimedWord import TimedWord
 from testing.random_testing import test_generation_2
-import time
 
 
 class Mut(object):
@@ -30,84 +29,101 @@ class NFAMut(object):
         self.f_states = f_states
 
 
-# --------------------------------- 算法1 - mutation testing用于测试集筛选 ---------------------------------
+def mutation_testing(hypothesisOTA, state_num, upper_guard, system):
+    equivalent = True
+    ctx = None
 
-def mutation_testing_1(hypothesisOTA, state_num, upper_guard, system):
     # 参数配置
-    hypothesisOTA = hypothesisOTA.build_simple_hypothesis()
-    test_num = len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10
     pretry = 0.9
     pstop = 0.02
-    linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
     max_steps = int(1.5 * state_num)
+    linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
+    test_num = len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10
+    nsel = 2000
 
-    # 生成候选测试集
+    # 测试集生成
     tests = []
     for i in range(test_num):
         tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
 
-    # 特殊处理状态数为1情况
-    if len(hypothesisOTA.states) == 1:
-        equivalent, ctx = test_execution(hypothesisOTA, system, tests)
-        return equivalent, ctx
-
-    # 生成变异体
-    nacc = 10
-    mutations = mutant_generation_state(hypothesisOTA, nacc, state_num)
-
-    # 变异分析生成测试集
-    Tsel = []  # mutation所筛选出来的测试集
-    nsel = 2000
-    if len(mutations) > 0:
-        # # mut由于数量较大，因此可进行一定的筛选
-        # IMut_sample = mutant_sample(hypothesisOTA.states, mutations)
-        IMut_sample = mutations
-        NFA_mut = NFA_mutant(hypothesisOTA, IMut_sample)  # 生成包含muts信息的NFA
-        print('tran_num', len(NFA_mut.trans), 'state_num', len(hypothesisOTA.states))
-        NFA_mut_tran_dict = get_tran_dict(NFA_mut)
-        # 找到test覆盖的muts，以下数组一一对应
-        pre_tests = []
-        cMuts = []
-        IMutsel = []
-        time1 = time.time()
-        for test in tests:
-            cMut, IMutsel = mutation_analysis(test, NFA_mut, IMutsel, NFA_mut_tran_dict)
-            if cMut:
-                pre_tests.append(test)
-                cMuts.append(cMut)
-        time2 = time.time()
-        print('mutation_analysis', time2 - time1)
-        if cMuts:
-            time3 = time.time()
-            Tsel = test_selection(pre_tests, IMutsel, cMuts, nsel)
-            time4 = time.time()
-            print('test_selection', time4 - time3)
-    else:
-        # raise Exception("Mutation Failed!")
-        Tsel = tests
-
+    # guard 变异分析
+    guard_tests = mutation_guard(hypothesisOTA, upper_guard, tests, nsel)
     # 测试执行
-    equivalent = True
-    ctx = None
-    if len(Tsel) > 0:
-        equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
-    else:
-        pass
+    if len(guard_tests) > 0:
+        print('guard mutation', len(guard_tests))
+        equivalent, ctx = test_execution(hypothesisOTA, system, guard_tests)
+
+    # 如果未找到反例
+    if equivalent:
+        # state 变异分析
+        state_tests = mutation_state(hypothesisOTA, tests, nsel, guard_tests, state_num)
+        # 测试执行
+        if len(state_tests) > 0:
+            print('state mutation', len(state_tests))
+            equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
     return equivalent, ctx
 
 
-# 将NFA中的迁移按source state分组
-def get_tran_dict(NFA_mut):
-    tran_dict = {}
-    for tran in NFA_mut.trans:
-        if str(tran[0]) in tran_dict.keys():
-            tran_dict[str(tran[0])].append(tran)
-        else:
-            tran_dict[str(tran[0])] = [tran]
-    return tran_dict
+# guard 变异
+def mutation_guard(hypothesis, upper_guard, tests, nsel):
+    Tsel = []
+    # 生成变异体
+    mutations = mutant_generation_guard(hypothesis, upper_guard)  # 生成的是tran list
+    # 生成NFA
+    NFA_mut = NFAMut(hypothesis.states, hypothesis.init_state, hypothesis.actions, hypothesis.trans + mutations, [])
+    # 变异分析 - pre_tests 与 cMuts 分别一一对应
+    NFA_mut_tran_dict = get_tran_dict_guard(NFA_mut)
+    pre_tests = []
+    cMuts = []
+    IMutsel = []
+    for test in tests:
+        cMut, IMutsel = mutation_analysis_guard(test, NFA_mut, IMutsel, NFA_mut_tran_dict)
+        if cMut:
+            pre_tests.append(test)
+            cMuts.append(cMut)
+    # 测试筛选
+    if cMuts:
+        Tsel = test_selection([], pre_tests, IMutsel, cMuts, nsel)
+    return Tsel
 
 
-# 根据状态分裂来生成
+# state 变异
+def mutation_state(hypothesis, tests, nsel, guard_tests, state_num):
+    Tsel = []
+    # 生成变异体
+    nacc = 10
+    mutations = mutant_generation_state(hypothesis, nacc, state_num)
+    # 生成NFA
+    # # mut由于数量较大，因此可进行一定的筛选
+    # IMut_sample = mutant_sample(hypothesisOTA.states, mutations)
+    IMut_sample = mutations
+    NFA_mut = NFA_mutant_state(hypothesis, IMut_sample)
+    # 变异分析 - pre_tests 与 cMuts 分别一一对应
+    NFA_mut_tran_dict = get_tran_dict(NFA_mut)
+    pre_tests = []
+    cMuts = []
+    IMutsel = []
+    for test in tests:
+        cMut, IMutsel = mutation_analysis_state(test, NFA_mut, IMutsel, NFA_mut_tran_dict)
+        if cMut:
+            pre_tests.append(test)
+            cMuts.append(cMut)
+    # 测试筛选
+    if cMuts:
+        Tsel = test_selection(guard_tests, pre_tests, IMutsel, cMuts, nsel)
+    return Tsel
+
+
+# 生成变异体 - guard 算子
+def mutant_generation_guard(hypothesis, upper_guard):
+    new_trans = []
+    tran_id = 0
+    for tran in hypothesis.trans:
+        pass
+    return new_trans
+
+
+# 生成变异体 - state split 算子
 def mutant_generation_state(hypothesis, nacc, state_num):
     Muts = []
     mId = 0
@@ -135,13 +151,66 @@ def mutant_generation_state(hypothesis, nacc, state_num):
     return Muts
 
 
-# 变异体筛选
-def mutant_sample(states, mutations):
-    pass
+# state变异分析 - 获得test覆盖到的mut
+def mutation_analysis_state(test, NMut, IMutsel, NFA_mut_tran_dict):
+    F_states = NMut.f_states
+    cMut = []
+
+    def tree_create(state, preTime, test_index):
+        if test_index >= len(test):
+            return True
+        cur_time = test[test_index].time + preTime
+        new_LTW = TimedWord(test[test_index].action, cur_time)
+        if len(state) == 2:
+            if state in F_states and (state[1] not in cMut):
+                cMut.append(state[1])
+                if state[1] not in IMutsel:
+                    IMutsel.append(state[1])
+        if str(state) not in NFA_mut_tran_dict.keys():
+            return True
+        cur_trans = NFA_mut_tran_dict[str(state)]
+        for tran in cur_trans:
+            if tran[1].is_passing_tran(new_LTW):
+                if tran[1].reset:
+                    tempTime = 0
+                else:
+                    tempTime = cur_time
+                tree_create(tran[2], tempTime, test_index + 1)
+        return True
+
+    tree_create(NMut.s_state, 0, 0)
+    return cMut, IMutsel
 
 
-# 根据muts生成NFA
-def NFA_mutant(hypothesis, IMuts):
+# guard变异分析 - 获得test覆盖到的mut
+def mutation_analysis_guard(test, NMut, IMutsel, NFA_mut_guard_tran_dict):
+    cMut = []
+
+    def tree_create(state, preTime, test_index):
+        if test_index >= len(test):
+            return True
+        cur_time = test[test_index].time + preTime
+        new_LTW = TimedWord(test[test_index].action, cur_time)
+        cur_trans = NFA_mut_guard_tran_dict[state]
+        for tran in cur_trans:
+            if tran.is_passing_tran(new_LTW):
+                if tran.reset:
+                    tempTime = 0
+                else:
+                    tempTime = cur_time
+                if isinstance(tran.tran_id, str):
+                    if tran.tran_id not in cMut:
+                        cMut.append(tran.tran_id)
+                    if tran.tran_id not in IMutsel:
+                        IMutsel.append(tran.tran_id)
+                tree_create(tran.target, tempTime, test_index + 1)
+
+    tree_create(NMut.s_state, 0, 0)
+    return cMut, IMutsel
+
+
+# 生成NFA - state 变异
+def NFA_mutant_state(hypothesis, IMuts):
     states = []
     s_state = [hypothesis.init_state]
     inputs = hypothesis.actions
@@ -173,45 +242,12 @@ def NFA_mutant(hypothesis, IMuts):
     return NFAMut(states, s_state, inputs, trans, f_states)
 
 
-# 变异分析 - 获得test覆盖到的mut
-def mutation_analysis(test, NMut, IMutsel, NFA_mut_tran_dict):
-    F_states = NMut.f_states
-    cMut = []
-
-    def tree_create(state, preTime, test_index):
-        if test_index >= len(test):
-            return True
-        cur_time = test[test_index].time + preTime
-        new_LTW = TimedWord(test[test_index].action, cur_time)
-        if len(state) == 2:
-            if state in F_states and (state[1] not in cMut):
-                cMut.append(state[1])
-                if state[1] not in IMutsel:
-                    IMutsel.append(state[1])
-        if str(state) not in NFA_mut_tran_dict.keys():
-            return True
-        cur_trans = NFA_mut_tran_dict[str(state)]
-        for tran in cur_trans:
-            if tran[1].is_passing_tran(new_LTW):
-                if tran[1].reset:
-                    tempTime = 0
-                else:
-                    tempTime = cur_time
-                tree_create(tran[2], tempTime, test_index + 1)
-        return True
-
-    tree_create(NMut.s_state, 0, 0)
-    return cMut, IMutsel
-
-
-# 测试选择
-def test_selection(Tests, C, Cset, nsel):
-    # Tests为当前所有tests, C为所有mutations, Cset为cover mutation set, nsel为选择的最大数量
+# 测试筛选
+def test_selection(cache_tests, Tests, C, Cset, nsel):
     Tsel = []
     CC = copy.deepcopy(C)
     tests = copy.deepcopy(Tests)
     cset = copy.deepcopy(Cset)
-
     pre_set = []
     while len(Tsel) < nsel and CC:
         cur_index = 0
@@ -222,12 +258,15 @@ def test_selection(Tests, C, Cset, nsel):
                 cur_max = cset[i]
                 cur_index = i
         if cur_max:
-            Tsel.append(tests[cur_index])
+            if tests[cur_index] not in cache_tests:
+                Tsel.append(tests[cur_index])
             pre_set = cur_max
         else:
             break
     return Tsel
 
+
+# --------------------------------- auxiliary function ---------------------------------
 
 # get mutated access seq leading to a single state
 def get_all_acc(hypothesis, state, state_num):
@@ -329,13 +368,10 @@ def get_Ik(hypothesis, qs, step):
     return IK
 
 
-# --------------------------------- 算法2 - mutation testing用于测试集生成 ---------------------------------
-
-def mutation_testing_2(hypothesisOTA, upper_guard, system):
+# 变异体筛选
+def mutant_sample(states, mutations):
     pass
 
-
-# --------------------------------- auxiliary function ---------------------------------
 
 # 测试执行
 def test_execution(hypothesisOTA, system, tests):
@@ -360,3 +396,25 @@ def prefixes(tws):
         temp_tws = tws[:i]
         new_prefixes.append(temp_tws)
     return new_prefixes
+
+
+# 将NFA中的迁移按source state分组
+def get_tran_dict(NFA_mut):
+    tran_dict = {}
+    for tran in NFA_mut.trans:
+        if str(tran[0]) in tran_dict.keys():
+            tran_dict[str(tran[0])].append(tran)
+        else:
+            tran_dict[str(tran[0])] = [tran]
+    return tran_dict
+
+
+# 将NFA中的迁移按source state分组
+def get_tran_dict_guard(NFA_mut):
+    tran_dict = {}
+    for tran in NFA_mut.trans:
+        if tran.source in tran_dict.keys():
+            tran_dict[tran.source].append(tran)
+        else:
+            tran_dict[tran.source] = [tran]
+    return tran_dict

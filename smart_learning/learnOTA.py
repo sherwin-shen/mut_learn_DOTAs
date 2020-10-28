@@ -55,6 +55,7 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
             hypothesisOTA.show_OTA()
 
         ### EQs
+        hypothesisOTA = hypothesisOTA.build_simple_hypothesis()
         equivalent, ctx = EQs(hypothesisOTA, upper_guard, state_num, system)
 
         if not equivalent:
