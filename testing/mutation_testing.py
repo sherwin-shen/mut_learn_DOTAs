@@ -154,8 +154,15 @@ def mutant_generation_guard(hypothesis, system, Tests, upper_guard):
 
     pre_tests = []
     Tsel = []
+
+    NFA_mut_guard_tran_dict = {}
+    for s in NFA_mut_guard.states:
+        NFA_mut_guard_tran_dict[s] = []
+    for t in NFA_mut_guard.trans:
+        NFA_mut_guard_tran_dict[t.source].append(t)
+
     for test in Tests:
-        cMut, IMutsel = mutation_analysis_guard(test, NFA_mut_guard, IMutsel, len(new_trans))
+        cMut, IMutsel = mutation_analysis_guard(test, NFA_mut_guard, IMutsel, NFA_mut_guard_tran_dict)
         if cMut:
             pre_tests.append(test)
             cMuts.append(cMut)
@@ -177,7 +184,7 @@ def mutant_generation_guard(hypothesis, system, Tests, upper_guard):
 
     return equivalent, ctx
 
-def mutation_analysis_guard(test, NMut, IMutsel, max_num):
+def mutation_analysis_guard1(test, NMut, IMutsel, max_num):
     s0 = NMut.s_state
     Trans = NMut.trans
     #F_states = NMut.f_states
@@ -185,17 +192,13 @@ def mutation_analysis_guard(test, NMut, IMutsel, max_num):
     j = 0
     nowTime = 0
 
-    def tree_create(state, ntran, preTime, test_index):
+    def tree_create(state, preTime, test_index):
         if test_index >= len(test):
             return
         time = test[test_index].time + preTime
         newTest = TimedWord(test[test_index].action, time)
 
-        if ntran and isinstance(ntran.tran_id, str):
-            if ntran.tran_id not in cMut:
-                cMut.append(ntran.tran_id)
-            if ntran.tran_id not in IMutsel:
-                IMutsel.append(ntran.tran_id)
+
 
         for tran in Trans:
             if tran.source == state and tran.is_passing_tran(newTest):
@@ -203,9 +206,52 @@ def mutation_analysis_guard(test, NMut, IMutsel, max_num):
                     tempTime = 0
                 else:
                     tempTime = time
+                if tran and isinstance(tran.tran_id, str):
+                    if tran.tran_id not in cMut:
+                        cMut.append(tran.tran_id)
+                    if tran.tran_id not in IMutsel:
+                        IMutsel.append(tran.tran_id)
                 #if tran.tran_id[0:3] == "new":
-                tree_create(tran.target, tran, tempTime, test_index + 1)
-    tree_create(s0, [], nowTime, j)
+                tree_create(tran.target, tempTime, test_index + 1)
+    tree_create(s0, nowTime, j)
+    return cMut, IMutsel
+
+# guard变异分析 - 获得test覆盖到的mut
+def mutation_analysis_guard(test, NMut, IMutsel, NFA_mut_guard_tran_dict):
+    cMut = []
+    catch={}
+    for i in range(len(test)):
+        catch[i]=[]
+
+
+    def tree_create(state, preTime, test_index):
+        if test_index >= len(test):
+            return True
+        cur_time = test[test_index].time + preTime
+        new_LTW = TimedWord(test[test_index].action, cur_time)
+        cur_trans = NFA_mut_guard_tran_dict[state]
+        for tran in cur_trans:
+            if tran.is_passing_tran(new_LTW):
+                if tran.reset:
+                    tempTime = 0
+                else:
+                    tempTime = cur_time
+                if isinstance(tran.tran_id, str):
+                    if tran.tran_id not in cMut:
+                        cMut.append(tran.tran_id)
+                    if tran.tran_id not in IMutsel:
+                        IMutsel.append(tran.tran_id)
+                #if [tran.target, tempTime] not in catch:
+                #    catch.append([tran.target, tempTime])
+                #    tree_create(tran.target, tempTime, test_index + 1, catch)
+
+                if [tran.target, tempTime] not in catch[test_index]:
+                    #temp_catch = copy.deepcopy(cache)
+                    tree_create(tran.target, tempTime, test_index + 1)
+                    catch[test_index].append([tran.target, tempTime])
+                    #temp_catch.append([tran.target, tempTime])
+                    #cache = temp_catch
+    tree_create(NMut.s_state, 0, 0)
     return cMut, IMutsel
 
 def get_guardshift_trans1(hypothesis, tran_id, next_trans, upper_guard):
