@@ -208,7 +208,7 @@ def mutation_analysis_guard(test, NMut, IMutsel, max_num):
     tree_create(s0, nowTime, j)
     return cMut, IMutsel
 
-def get_guardshift_trans(hypothesis, tran_id, next_trans, upper_guard):
+def get_guardshift_trans1(hypothesis, tran_id, next_trans, upper_guard):
     new_trans = []
     mut_times =2
     for q in hypothesis.states:
@@ -513,6 +513,45 @@ def test_selection(Tests, C, Cset, nsel): #C:all mutations; Cset:cover mutation 
             if c in CC:
                 CC.remove(c)
     return Tsel
+
+
+def get_guardshift_trans(hypothesis, operator_type, upper_guard):
+    new_trans=[]
+
+    if operator_type == "restrict":
+        new_trans.append(guard_restrict_opetator(hypothesis, upper_guard))
+    elif operator_type == "widen":
+        new_trans.append(guard_widen_operator(hypothesis, upper_guard))
+    else:
+        return new_trans
+    return new_trans
+
+def guard_restrict_opetator(hypothesis, upper_guard):
+
+
+    return
+
+def guard_widen_operator(hypothesis, upper_guard, times):
+    new_trans = []
+    tranId = 0
+    for tran in hypothesis.trans:
+        for guard in tran.guards:
+            min = guard.get_min()
+            max = guard.get_max()
+            if min == 0 and max == float("inf"):
+                gvalue = random.randint(0, upper_guard)
+                for state in hypothesis.states:
+                    new_trans.append(OTATran("new" + str(tranId), tran.source, tran.action, Guard(["[0," + str(gvalue) + ")"]), tran.reset, state))
+                    new_trans.append(OTATran("new" + str(tranId), tran.source, tran.action, Guard(["(" + str(gvalue) + ",+)"]), tran.reset, state))
+
+            if min > 0:
+                min -= random.randint(1,upper_guard-1)
+                if min < 0:
+                    min = 0
+            if max != float("inf"):
+                max += random.randint(1,upper_guard-1)
+
+    return
 
 
 # --------------------------------- 算法2 - mutation testing用于测试集生成 ---------------------------------
