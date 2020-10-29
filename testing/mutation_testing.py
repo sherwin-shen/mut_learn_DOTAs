@@ -9,7 +9,7 @@ from testing.random_testing import test_generation_2
 
 # --------------------------------- 算法1 - mutation testing用于测试集筛选 ---------------------------------
 
-def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
+def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
     # 生成候选测试集
     test_num = len(hypothesisOTA.states)*len(hypothesisOTA.states)*upper_guard*10
     tests = []
@@ -22,9 +22,9 @@ def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
     print("lenth of tests:", len(tests))
 
     #状态数为1 特殊处理：
-    if len(hypothesisOTA.states) == 1:
-        equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests, upper_guard)
-        return equivalent, ctx
+    #if len(hypothesisOTA.states) == 1:
+    #    equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests, upper_guard)
+    #    return equivalent, ctx
 
 
     # 生成变异体及变异分析
@@ -71,7 +71,7 @@ def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
         #raise Exception("Mutation Failed!")
     return equivalent, ctx
 
-def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
+def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
     # 生成候选测试集
     test_num = len(hypothesisOTA.states)*len(hypothesisOTA.states)*upper_guard*10
     tests = []
@@ -136,7 +136,7 @@ class CoverATree_Node(object):
 def mutant_generation_guard(hypothesis, system, Tests, upper_guard):
     cMuts = []
     IMutsel = []
-    mId=0
+    #mId=0
     #next_trans = list(len(hypothesis.states))
     #next_trans = {}
     #pre_trans = list(len(hypothesis.states))
@@ -351,11 +351,11 @@ def mutant_generation_split(hypothesis, nacc):
         else:
             subset_accq = random.sample(set_accq, nacc)
         for s1 in subset_accq:
-            if len(s1) < 1:
-                continue
+            #if len(s1) < 1:
+            #    continue
             for s2 in subset_accq:
-                if len(s2) < 1:
-                    continue
+                #if len(s2) < 1:
+                #    continue
                 if s1 == s2:
                     continue
                 else:
@@ -587,6 +587,8 @@ def guard_widen_operator(hypothesis, upper_guard, times):
                 for i in range(times):
                     gvalue = random.randint(0, upper_guard)
                     for state in hypothesis.states:
+                        #if state == tran.target:
+                        #    continue
                         if coin_flip(0.5):
                             new_trans.append(
                                 OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[0," + str(gvalue) + ")")],
@@ -784,8 +786,9 @@ def mut_split(s1, s2, hypothesis, mId):
         return None, mId
     sqSuf = arg_maxs(s1, s2)
     sqSuf_tran = []
-    for sq in sqSuf:
-        sqSuf_tran.append(sq)
+    if sqSuf:
+        for sq in sqSuf:
+            sqSuf_tran.append(sq)
     ss1 = s1[0:len(s1) - len(sqSuf_tran)]
     if len(ss1) == 0:
         return None, mId
