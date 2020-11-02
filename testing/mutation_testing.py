@@ -2,7 +2,9 @@ import random
 import copy
 import math
 from common.TimedWord import TimedWord
-from testing.random_testing import test_generation_2
+from testing.random_testing import test_generation_2, coin_flip
+from common.hypothesis import OTATran
+from common.TimeInterval import Guard
 
 
 class Mut(object):
@@ -67,8 +69,9 @@ def mutation_testing(hypothesisOTA, state_num, upper_guard, system):
 # guard 变异
 def mutation_guard(hypothesis, upper_guard, tests, nsel):
     Tsel = []
+    times = 2  # mutations的次数
     # 生成变异体
-    mutations = mutant_generation_guard(hypothesis, upper_guard)  # 生成的是tran list
+    mutations = mutant_generation_guard(hypothesis, upper_guard, times)  # 生成的是tran list
     # 生成NFA
     NFA_mut = NFAMut(hypothesis.states, hypothesis.init_state, hypothesis.actions, hypothesis.trans + mutations, [])
     # 变异分析 - pre_tests 与 cMuts 分别一一对应
@@ -115,11 +118,55 @@ def mutation_state(hypothesis, tests, nsel, guard_tests, state_num):
 
 
 # 生成变异体 - guard 算子
-def mutant_generation_guard(hypothesis, upper_guard):
+def mutant_generation_guard(hypothesis, upper_guard, times):
     new_trans = []
     tran_id = 0
-    for tran in hypothesis.trans:
-        pass
+    for i in range(times):
+        for tran in hypothesis.trans:
+            for guard in tran.guards:
+                guard_min = guard.get_min()
+                guard_max = guard.get_max()
+                # 特殊情况处理
+                if guard_min == 0 and guard_max == float("inf"):
+                    new_value = random.randint(1, upper_guard)
+                    for state in hypothesis.states:
+                        if state == tran.target:
+                            continue
+                        if coin_flip(0.5):
+                            new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("[0," + str(new_value) + ")")], tran.reset, state))
+                            tran_id += 1
+                            new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("[" + str(new_value) + ",+)")], tran.reset, state))
+                            tran_id += 1
+                        else:
+                            new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("[0," + str(new_value) + "]")], tran.reset, state))
+                            tran_id += 1
+                            new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("(" + str(new_value) + ",+)")], tran.reset, state))
+                            tran_id += 1
+                    continue
+                # 正常情况处理
+                guard_min -= random.randint(1, upper_guard)
+                if guard_min < 0:
+                    guard_min = 0
+                if guard_max != float("inf"):
+                    guard_max += random.randint(1, upper_guard)
+                    if coin_flip(0.5):
+                        if coin_flip(0.5):
+                            new_guard = Guard("(" + str(guard_min) + "," + str(guard_max) + ")")
+                        else:
+                            new_guard = Guard("(" + str(guard_min) + "," + str(guard_max) + "]")
+                    else:
+                        if coin_flip(0.5):
+                            new_guard = Guard("[" + str(guard_min) + "," + str(guard_max) + ")")
+                        else:
+                            new_guard = Guard("[" + str(guard_min) + "," + str(guard_max) + "]")
+                else:
+                    if coin_flip(0.5):
+                        new_guard = Guard("(" + str(guard_min) + ",+)")
+                    else:
+                        new_guard = Guard("[" + str(guard_min) + ",+)")
+                new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [new_guard], tran.reset, tran.target))
+                tran_id += 1
+
     return new_trans
 
 
@@ -136,11 +183,7 @@ def mutant_generation_state(hypothesis, nacc, state_num):
         else:
             subset_accq = random.sample(set_accq, nacc)
         for s1 in subset_accq:
-            if len(s1) < 1:
-                continue
             for s2 in subset_accq:
-                if len(s2) < 1:
-                    continue
                 if s1 == s2:
                     continue
                 else:
@@ -185,6 +228,9 @@ def mutation_analysis_state(test, NMut, IMutsel, NFA_mut_tran_dict):
 # guard变异分析 - 获得test覆盖到的mut
 def mutation_analysis_guard(test, NMut, IMutsel, NFA_mut_guard_tran_dict):
     cMut = []
+    catch = {}
+    for i in range(len(test)):
+        catch[i] = []
 
     def tree_create(state, preTime, test_index):
         if test_index >= len(test):
@@ -203,6 +249,9 @@ def mutation_analysis_guard(test, NMut, IMutsel, NFA_mut_guard_tran_dict):
                         cMut.append(tran.tran_id)
                     if tran.tran_id not in IMutsel:
                         IMutsel.append(tran.tran_id)
+                if [tran.target, tempTime] not in catch[test_index]:
+                    catch[test_index].append([tran.target, tempTime])
+                    tree_create(tran.target, tempTime, test_index + 1)
                 tree_create(tran.target, tempTime, test_index + 1)
 
     tree_create(NMut.s_state, 0, 0)
@@ -297,8 +346,9 @@ def mut_split(s1, s2, hypothesis, mId):
         return None, mId
     sqSuf = arg_maxs(s1, s2)
     sqSuf_tran = []
-    for sq in sqSuf:
-        sqSuf_tran.append(sq)
+    if sqSuf:
+        for sq in sqSuf:
+            sqSuf_tran.append(sq)
     ss1 = s1[0:len(s1) - len(sqSuf_tran)]
     if len(ss1) == 0:
         return None, mId
