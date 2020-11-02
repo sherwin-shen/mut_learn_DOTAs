@@ -39,7 +39,7 @@ def random_testing_2(hypothesis, upper_guard, state_num, system):
     test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10
     pretry = 0.9
     pstop = 0.02
-    linfix = math.ceil(len(hypothesis.states) / 2)
+    linfix = min(math.ceil(len(hypothesis.states) / 2), math.ceil(state_num / 2))
     max_steps = int(1.5 * state_num)
 
     ctx = None
