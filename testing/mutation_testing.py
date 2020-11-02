@@ -34,6 +34,7 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
     nacc = 10
     nsel = 100
     mutations = mutant_generation_split(hypothesisOTA, nacc)
+    print("lenth of mutations:", len(mutations))
     if len(mutations) > 0:
         #IMutsample = mutant_sample(hypothesisOTA.states, mutations)
         IMutsample = mutations
@@ -50,6 +51,7 @@ def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
         print("lenth of pre_tests:", len(pre_tests))
     if cMuts:
         Tsel = test_selection(pre_tests, IMutsel, cMuts, 2000)  # 选择尽可能少的测试集覆盖cMuts里所包含的muts
+        print("lenth of Tsel:", len(Tsel))
 
         for test in Tsel:
             for i in range(len(test)-1):
@@ -147,6 +149,7 @@ def mutant_generation_guard(hypothesis, system, Tests, upper_guard):
     #    next_trans[tran.source].append(tran)
         #pre_trans[int(tran.target)].append(tran)
     tran_id = 0
+    #new_trans = get_guardshift_trans(hypothesis, "complement", upper_guard)
     new_trans = get_guardshift_trans(hypothesis, "widen", upper_guard)
     NFA_mut_guard = NFAMut(hypothesis.states, hypothesis.init_state, hypothesis.actions, hypothesis.trans + new_trans, [])
 
@@ -507,18 +510,17 @@ def mutation_analysis(test, NMut, IMutsel):
         time = test[test_index].time + preTime
         newTest = TimedWord(test[test_index].action, time)
 
-        if len(state) == 2:
-            if state in F_states and (state[1] not in cMut):
-                cMut.append(state[1])
-                if state[1] not in IMutsel:
-                    IMutsel.append(state[1])
-
         for tran in Trans:
             if tran[0] == state and tran[1].is_passing_tran(newTest):
                 if tran[1].reset:
                     tempTime = 0
                 else:
                     tempTime = time
+                if len(tran[2]) == 2:
+                    if tran[2] in F_states and (tran[2][1] not in cMut):
+                        cMut.append(tran[2][1])
+                        if tran[2][1] not in IMutsel:
+                            IMutsel.append(tran[2][1])
                 tree_create(tran[2], tempTime, test_index + 1)
     tree_create(s0, nowTime, j)
     return cMut, IMutsel
@@ -568,12 +570,104 @@ def get_guardshift_trans(hypothesis, operator_type, upper_guard):
         new_trans.extend(guard_restrict_opetator(hypothesis, upper_guard))
     elif operator_type == "widen":
         new_trans.extend(guard_widen_operator(hypothesis, upper_guard, 2))
+    elif operator_type == "complement":
+        new_trans.extend(guard_complement_operator(hypothesis, upper_guard, 2))
     else:
         return []
     return new_trans
 
 def guard_restrict_opetator(hypothesis, upper_guard):
     return
+
+def guard_complement_operator(hypothesis, upper_guard, times):
+    new_trans = []
+    tranId = 0
+    for tran in hypothesis.trans:
+        for guard in tran.guards:
+            guard_min = guard.get_min()
+            guard_max = guard.get_max()
+
+            if guard_min == 0 and guard.get_closed_min() and guard_max == float("inf"):
+                for i in range(times):
+                    gvalue = random.randint(0, upper_guard)
+                    for state in hypothesis.states:
+                        # if state == tran.target:
+                        #    continue
+                        if coin_flip(0.5):
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action,
+                                        [Guard("[0," + str(gvalue) + ")")],
+                                        tran.reset, state))
+                            tranId += 1
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action,
+                                        [Guard("[" + str(gvalue) + ",+)")],
+                                        tran.reset, state))
+                            tranId += 1
+                        else:
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action,
+                                        [Guard("(" + str(gvalue) + ",+)")],
+                                        tran.reset, state))
+                            tranId += 1
+                            new_trans.append(
+                                OTATran("new" + str(tranId), tran.source, tran.action,
+                                        [Guard("[0," + str(gvalue) + "]")],
+                                        tran.reset, state))
+                            tranId += 1
+                continue
+            else:
+                if guard_min == 0 and guard.get_closed_min():
+                    pass
+                elif guard_min == 0 and not guard.get_closed_min():
+                    new_trans.append(
+                        OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[0,0]")], tran.reset, state))
+                    tranId += 1
+                else:
+                    step = int(guard_min / min(times, guard_min))
+                    temp_min = 0
+                    for i in range(min(times, guard_min)):
+                        if i == min(times, guard_min) - 1:
+                            if guard.get_closed_min():
+                                new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + ")")
+                            else:
+                                new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + "]")
+                        else:
+                            new_guard = Guard("[" + str(temp_min) + "," + str(temp_min + step) + ")")
+                        new_trans.append(
+                            OTATran("new" + str(tranId), tran.source, tran.action, [new_guard], tran.reset,
+                                    tran.target))
+                        tranId += 1
+                        temp_min += step
+
+                if guard_max == float("inf") or guard_max > upper_guard:
+                    pass
+                elif guard_max == upper_guard and guard.get_closed_max():
+                    pass
+                elif guard_max == upper_guard and not guard.get_closed_max():
+                    new_trans.append(
+                        OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[" + str(upper_guard) + "," + str(upper_guard) + "]")], tran.reset, state))
+                    tranId += 1
+                else:
+                    step = int(upper_guard - guard_max / min(times, upper_guard - guard_max))
+                    temp_max = guard_max
+                    for i in range(min(times, upper_guard - guard_max)):
+                        if i == 0:
+                            if guard.get_closed_max():
+                                new_guard = Guard("(" + str(temp_max) + "," + str(temp_max + step) + ")")
+                            else:
+                                new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
+                        elif i == min(times, upper_guard - guard_max) - 1:
+                            new_guard = Guard("[" + str(temp_max) + "," + str(upper_guard) + "]")
+                        else:
+                            new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
+                        new_trans.append(
+                            OTATran("new" + str(tranId), tran.source, tran.action, [new_guard], tran.reset,
+                                    tran.target))
+                        tranId += 1
+                        temp_max += step
+    return new_trans
+
 
 def guard_widen_operator(hypothesis, upper_guard, times):
     new_trans = []
