@@ -100,6 +100,65 @@ def mutation_guard(hypothesis, upper_guard, tests, nsel, times):
 def mutant_generation_guard(hypothesis, upper_guard, times):
     new_trans = []
     tran_id = 0
+    for tran in hypothesis.trans:
+        for guard in tran.guards:
+            guard_min = guard.get_min()
+            guard_max = guard.get_max()
+            # 特殊情况处理 - [0,+)
+            if guard_min == 0 and guard.get_closed_min() and guard_max == float("inf"):
+                for i in range(times):
+                    new_value = random.randint(1, upper_guard)
+                    for state in hypothesis.states:
+                        if state == tran.target:
+                            continue
+                        new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("[0," + str(new_value) + ")")], tran.reset, state))
+                        tran_id += 1
+                        new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("[" + str(new_value) + ",+)")], tran.reset, state))
+                        tran_id += 1
+                continue
+            # 正常情况处理 - 处理左边
+            if guard_min == 0:
+                if not guard.get_closed_min():
+                    new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [Guard("[0,0]")], tran.reset, tran.target))
+                    tran_id += 1
+            else:
+                step = int(guard_min / min(times, guard_min))
+                temp_min = 0
+                for i in range(min(times, int(guard_min))):
+                    if i == min(times, guard_min) - 1:
+                        if guard.get_closed_min():
+                            new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + ")")
+                        else:
+                            new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + "]")
+                    else:
+                        new_guard = Guard("[" + str(temp_min) + "," + str(temp_min + step) + ")")
+                    new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [new_guard], tran.reset, tran.target))
+                    tran_id += 1
+                    temp_min += step
+            # 正常情况处理 - 处理右边
+            if guard_max == float("inf") or guard_max > upper_guard:
+                pass
+            elif guard_max == upper_guard and guard.get_closed_max():
+                pass
+            elif guard_max == upper_guard and not guard.get_closed_max():
+                new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [Guard("[" + str(upper_guard) + "," + str(upper_guard) + "]")], tran.reset, tran.target))
+                tran_id += 1
+            else:
+                step = int(upper_guard - guard_max / min(times, upper_guard - guard_max))
+                temp_max = guard_max
+                for i in range(min(times, int(upper_guard - guard_max))):
+                    if i == 0:
+                        if guard.get_closed_max():
+                            new_guard = Guard("(" + str(temp_max) + "," + str(temp_max + step) + ")")
+                        else:
+                            new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
+                    elif i == min(times, upper_guard - guard_max) - 1:
+                        new_guard = Guard("[" + str(temp_max) + "," + str(upper_guard) + "]")
+                    else:
+                        new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
+                    new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [new_guard], tran.reset, tran.target))
+                    tran_id += 1
+                    temp_max += step
     return new_trans
 
 
@@ -285,10 +344,8 @@ def test_execution(hypothesisOTA, system, tests):
     for test in tests:
         test_list = prefixes(test)
         for j in test_list:
-            print([i.show() for i in j])
             DRTWs, value = hypothesisOTA.test_DTWs(j)
             realDRTWs, realValue = system.test_DTWs(j)
-            print(value, realValue)
             if realValue != value:
                 flag = False
                 ctx = test
