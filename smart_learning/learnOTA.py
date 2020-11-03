@@ -4,7 +4,12 @@ from common.hypothesis import struct_discreteOTA, struct_hypothesisOTA
 from smart_learning.teacher import EQs
 
 
-def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
+def learnOTA_smart(system, debug_flag):
+    actions = system.actions
+    upper_guard = system.max_time_value()  # 可以由用户根据先验知识自己设置
+    minimal_duration = system.get_minimal_duration()  # 可以由用户根据先验知识自己设置
+    state_num = len(system.states)  # 非必须
+
     ### init Table
     table = obsTable.initTable(actions, system)
     if debug_flag:
@@ -56,7 +61,7 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
 
         ### EQs
         hypothesisOTA = hypothesisOTA.build_simple_hypothesis()
-        equivalent, ctx = EQs(hypothesisOTA, upper_guard, state_num, system)
+        equivalent, ctx = EQs(hypothesisOTA, upper_guard, state_num, minimal_duration, system)
 
         if not equivalent:
             # show ctx

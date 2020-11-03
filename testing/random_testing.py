@@ -36,7 +36,7 @@ def test_generation_1(actions, upper_guard, state_num):
 
 # 随机测试算法2 - 源自：Efficient Active Automata Learning via Mutation Testing
 def random_testing_2(hypothesis, upper_guard, state_num, system):
-    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10
+    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10)
     pretry = 0.9
     pstop = 0.02
     linfix = min(math.ceil(len(hypothesis.states) / 2), math.ceil(state_num / 2))

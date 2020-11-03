@@ -12,7 +12,7 @@ def TQs(LTWs, system):
     return LRTWs, value
 
 
-def EQs(hypothesisOTA, upper_guard, state_num, system):
+def EQs(hypothesisOTA, upper_guard, state_num, minimal_duration, system):
     # # 测试1 - 完全随机测试
     # equivalent, ctx = random_testing_1(hypothesisOTA, upper_guard, state_num, system)
 
@@ -23,7 +23,7 @@ def EQs(hypothesisOTA, upper_guard, state_num, system):
     # equivalent, ctx = random_testing_3(hypothesisOTA, upper_guard, state_num, system)
 
     # 测试4 - 随机测试结合变异测试
-    equivalent, ctx = mutation_testing(hypothesisOTA, state_num, upper_guard, system)
+    equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, minimal_duration, system)
 
     if ctx is not None:
         ctx = minimize_counterexample(hypothesisOTA, system, ctx)

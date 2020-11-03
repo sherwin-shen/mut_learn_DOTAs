@@ -92,6 +92,18 @@ class OTA(object):
                     max_time_value = temp_max_value
         return max_time_value
 
+    # 将hypothesis的guard按照minimal_duration切分
+    def guard_split(self, minimal_duration, upper_guard):
+        new_trans = []
+        tran_id = 0
+        for tran in self.trans:
+            for guard in tran.guards:
+                temp_guards = get_split_guards(guard, minimal_duration, upper_guard)
+                for temp_guard in temp_guards:
+                    new_trans.append(OTATran(tran_id, tran.source, tran.action, [temp_guard], tran.reset, tran.target))
+                    tran_id += 1
+        return OTA(self.actions, self.states, new_trans, self.init_state, self.accept_states)
+
 
 class DiscreteOTATran(object):
     def __init__(self, tran_id, source, action, time_point, reset, target):
@@ -247,3 +259,44 @@ def is_int(num):
         return True
     else:
         return False
+
+
+# guard按照minimal_duration进行切分，直到超过upper_guard
+def get_split_guards(guard, step, upper_guard):
+    temp_guards = []
+    min_value = guard.get_min()
+    closed_min = '[' if guard.get_closed_min() else '('
+    max_value = guard.get_max()
+    closed_max = ']' if guard.get_closed_max() else ')'
+    if min_value >= upper_guard:
+        return [guard]
+    while min_value < upper_guard and min_value < max_value:
+        if closed_min == '(' and step % 2 != 0:
+            temp_max = min_value + (step + 1) / 2
+        elif closed_min == '(' and step % 2 == 0:
+            temp_max = min_value + step / 2
+        elif closed_min == '[' and step % 2 != 0:
+            temp_max = min_value + (step - 1) / 2
+        else:
+            temp_max = min_value + step / 2
+
+        if temp_max >= upper_guard or temp_max >= max_value:
+            break
+
+        if closed_min == '(' and step % 2 != 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
+            closed_min = '['
+        elif closed_min == '(' and step % 2 == 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
+            closed_min = '('
+        elif closed_min == '[' and step % 2 != 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
+            closed_min = '('
+        else:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
+            closed_min = '['
+        min_value = temp_max
+    if max_value == float('inf'):
+        max_value = '+'
+    temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(max_value) + closed_max))
+    return temp_guards

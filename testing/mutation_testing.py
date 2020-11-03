@@ -2,8 +2,8 @@ import random
 import copy
 import math
 from common.TimedWord import TimedWord
-from testing.random_testing import test_generation_2, coin_flip
-from common.hypothesis import OTATran
+from testing.random_testing import test_generation_2
+from common.hypothesis import OTATran, get_split_guards
 from common.TimeInterval import Guard
 
 
@@ -32,7 +32,7 @@ class NFAMut(object):
 
 
 # 变异测试主函数
-def mutation_testing(hypothesisOTA, state_num, upper_guard, system):
+def mutation_testing(hypothesisOTA, upper_guard, state_num, minimal_duration, system):
     equivalent = True
     ctx = None
 
@@ -41,9 +41,8 @@ def mutation_testing(hypothesisOTA, state_num, upper_guard, system):
     pstop = 0.02
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
     linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
-    test_num = len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10
+    test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
     nsel = 2000
-    times = 2  # guard mutations的次数
 
     # 测试集生成
     tests = []
@@ -51,7 +50,7 @@ def mutation_testing(hypothesisOTA, state_num, upper_guard, system):
         tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
 
     # guard 变异分析
-    guard_tests = mutation_guard(hypothesisOTA, upper_guard, tests, nsel, times)
+    guard_tests = mutation_guard(hypothesisOTA, minimal_duration, upper_guard, tests, nsel)
     # 测试执行
     if len(guard_tests) > 0:
         print('guard mutation', len(guard_tests))
@@ -60,7 +59,7 @@ def mutation_testing(hypothesisOTA, state_num, upper_guard, system):
     # 如果未找到反例
     if equivalent:
         # state 变异分析
-        state_tests = mutation_state(hypothesisOTA, tests, nsel, guard_tests, state_num)
+        state_tests = mutation_state(hypothesisOTA, tests, nsel, guard_tests, state_num, minimal_duration, upper_guard)
         # 测试执行
         if len(state_tests) > 0:
             print('state mutation', len(state_tests))
@@ -74,10 +73,10 @@ def mutation_testing(hypothesisOTA, state_num, upper_guard, system):
 
 
 # guard 变异
-def mutation_guard(hypothesis, upper_guard, tests, nsel, times):
+def mutation_guard(hypothesis, minimal_duration, upper_guard, tests, nsel):
     Tsel = []
     # 生成变异体
-    mutations = mutant_generation_guard(hypothesis, upper_guard, times)  # 生成的是tran list
+    mutations = mutant_generation_guard(hypothesis, minimal_duration, upper_guard)  # 生成的是tran list
     # 生成NFA
     NFA_mut = NFAMut(hypothesis.states, hypothesis.init_state, hypothesis.actions, hypothesis.trans + mutations, [])
     # 变异分析 - pre_tests 与 cMuts 分别一一对应
@@ -97,7 +96,7 @@ def mutation_guard(hypothesis, upper_guard, tests, nsel, times):
 
 
 # 生成变异体 - guard 算子
-def mutant_generation_guard(hypothesis, upper_guard, times):
+def mutant_generation_guard(hypothesis, step, upper_guard):
     new_trans = []
     tran_id = 0
     for tran in hypothesis.trans:
@@ -106,14 +105,12 @@ def mutant_generation_guard(hypothesis, upper_guard, times):
             guard_max = guard.get_max()
             # 特殊情况处理 - [0,+)
             if guard_min == 0 and guard.get_closed_min() and guard_max == float("inf"):
-                for i in range(times):
-                    new_value = random.randint(1, upper_guard)
-                    for state in hypothesis.states:
+                temp_guards = get_split_guards(guard, step, upper_guard)
+                for state in hypothesis.states:
+                    for temp_guard in temp_guards:
                         if state == tran.target:
                             continue
-                        new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("[0," + str(new_value) + ")")], tran.reset, state))
-                        tran_id += 1
-                        new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [Guard("[" + str(new_value) + ",+)")], tran.reset, state))
+                        new_trans.append(OTATran('new_' + str(tran_id), tran.source, tran.action, [temp_guard], tran.reset, state))
                         tran_id += 1
                 continue
             # 正常情况处理 - 处理左边
@@ -122,43 +119,28 @@ def mutant_generation_guard(hypothesis, upper_guard, times):
                     new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [Guard("[0,0]")], tran.reset, tran.target))
                     tran_id += 1
             else:
-                step = int(guard_min / min(times, guard_min))
-                temp_min = 0
-                for i in range(min(times, int(guard_min))):
-                    if i == min(times, guard_min) - 1:
-                        if guard.get_closed_min():
-                            new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + ")")
-                        else:
-                            new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + "]")
-                    else:
-                        new_guard = Guard("[" + str(temp_min) + "," + str(temp_min + step) + ")")
-                    new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [new_guard], tran.reset, tran.target))
+                if guard.get_closed_min():
+                    left_guard = Guard('[0,' + str(guard_min) + ')')
+                else:
+                    left_guard = Guard('[0,' + str(guard_min) + ']')
+                temp_guards = get_split_guards(left_guard, step, upper_guard)
+                for temp_guard in temp_guards:
+                    new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [temp_guard], tran.reset, tran.target))
                     tran_id += 1
-                    temp_min += step
             # 正常情况处理 - 处理右边
             if guard_max == float("inf") or guard_max > upper_guard:
                 pass
-            elif guard_max == upper_guard and guard.get_closed_max():
+            elif guard_max == upper_guard:
                 pass
-            elif guard_max == upper_guard and not guard.get_closed_max():
-                new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [Guard("[" + str(upper_guard) + "," + str(upper_guard) + "]")], tran.reset, tran.target))
-                tran_id += 1
             else:
-                step = int(upper_guard - guard_max / min(times, upper_guard - guard_max))
-                temp_max = guard_max
-                for i in range(min(times, int(upper_guard - guard_max))):
-                    if i == 0:
-                        if guard.get_closed_max():
-                            new_guard = Guard("(" + str(temp_max) + "," + str(temp_max + step) + ")")
-                        else:
-                            new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
-                    elif i == min(times, upper_guard - guard_max) - 1:
-                        new_guard = Guard("[" + str(temp_max) + "," + str(upper_guard) + "]")
-                    else:
-                        new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
-                    new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [new_guard], tran.reset, tran.target))
+                if guard.get_closed_max():
+                    left_guard = Guard('(' + str(guard_max) + ',+)')
+                else:
+                    left_guard = Guard('[' + str(guard_max) + ',+)')
+                temp_guards = get_split_guards(left_guard, step, upper_guard)
+                for temp_guard in temp_guards:
+                    new_trans.append(OTATran("new" + str(tran_id), tran.source, tran.action, [temp_guard], tran.reset, tran.target))
                     tran_id += 1
-                    temp_max += step
     return new_trans
 
 
@@ -195,16 +177,17 @@ def mutation_analysis_guard(test, NMut, IMutsel, NFA_mut_guard_tran_dict):
 
 
 # state 变异
-def mutation_state(hypothesis, tests, nsel, guard_tests, state_num):
+def mutation_state(hypothesis, tests, nsel, guard_tests, state_num, minimal_duration, upper_guard):
+    hypothesis_guard_split = hypothesis.guard_split(minimal_duration, upper_guard)
     Tsel = []
     # 生成变异体
     nacc = 10
-    mutations = mutant_generation_state(hypothesis, nacc, state_num)
+    mutations = mutant_generation_state(hypothesis_guard_split, nacc, state_num)
     # 生成NFA
     # # mut由于数量较大，因此可进行一定的筛选
     # IMut_sample = mutant_sample(hypothesisOTA.states, mutations)
     IMut_sample = mutations
-    NFA_mut = NFA_mutant_state(hypothesis, IMut_sample)
+    NFA_mut = NFA_mutant_state(hypothesis_guard_split, IMut_sample)
     # 变异分析 - pre_tests 与 cMuts 分别一一对应
     NFA_mut_tran_dict = get_tran_dict(NFA_mut)
     pre_tests = []

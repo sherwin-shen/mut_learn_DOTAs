@@ -4,7 +4,8 @@ from common.system import build_canonicalOTA
 from testing.random_testing import test_generation_1
 
 
-def validate(learned_system, system, upper_guard):
+def validate(learned_system, system):
+    upper_guard = system.max_time_value()
     new_system = build_canonicalOTA(deepcopy(system))
     # 比较是否等价
     correct_flag, ctx = equivalence(learned_system, new_system, upper_guard)

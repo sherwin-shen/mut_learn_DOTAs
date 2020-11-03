@@ -16,18 +16,11 @@ def main():
     system = build_system(model)
     make_system(system, result_path, '/model_target')
 
-    # get prior information required for learning
-    with open(precondition_file, 'r') as json_precondition:
-        information = json.load(json_precondition)
-        actions = information["inputs"]
-        upper_guard = information["upperGuard"]  # upper bound of guard time
-        state_num = information["stateNum"]  # not necessary
-
-    # pac learning of DOTAs
+    # mutation learning of DOTAs
     start_time = time.time()
     print("********** learning starting *************")
     if teacher_type == "smart_teacher":
-        learned_system, mq_num, eq_num, test_num, test_num_cache, table_num = learnOTA_smart(system, actions, upper_guard, state_num, debug_flag)
+        learned_system, mq_num, eq_num, test_num, test_num_cache, table_num = learnOTA_smart(system, debug_flag)
     elif teacher_type == "normal_teacher":
         raise Exception('暂不支持 normal_teacher！')
     else:
@@ -44,7 +37,7 @@ def main():
         print("Succeed! The result is as follows:")
         # validate
         make_hypothesis(learned_system, result_path, '/model_hypothesis')
-        correct_flag, passing_rate = validate(learned_system, system, upper_guard)
+        correct_flag, passing_rate = validate(learned_system, system)
         print("Total time of learning: " + str(end_time - start_time))
         print("Total number of MQs (no-cache): " + str(mq_num))
         print("Total number of EQs (no-cache): " + str(eq_num))
@@ -83,18 +76,16 @@ if __name__ == '__main__':
 
     ### file directory
     # file_path = sys.argv[1]
-    file_path = "benchmarks/3_2_10/3_2_10-1"
-    # target model file
-    model_file = file_path + "/model.json"
-    # prior information required for learning
-    precondition_file = file_path + "/precondition.json"
+    model_file = "benchmarks/3_2_10/3_2_10-6.json"
 
     ### teacher type - smart_teacher / normal_teacher
     # teacher_type = sys.argv[2]
     teacher_type = "smart_teacher"
 
     # results file directory
-    result_path = 'results/' + file_path + '/' + teacher_type
+    temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0]
+    result_path = 'results/' + teacher_type + '/' + temp_path
+
     # debug mode
     debug_flag = False
 

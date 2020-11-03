@@ -125,6 +125,16 @@ class System(object):
                     max_time_value = temp_max_value
         return max_time_value
 
+    # Get the minimal duration of a (finite) time guard
+    def get_minimal_duration(self):
+        complete_system = build_canonicalOTA(copy.deepcopy(self))
+        res = float('inf')
+        for tran in complete_system.trans:
+            for guard in tran.guards:
+                if guard.get_region_num() < res:
+                    res = guard.get_region_num()
+        return res
+
 
 class SysTran(object):
     def __init__(self, tran_id, source, action, guards, reset, target):

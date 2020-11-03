@@ -189,6 +189,16 @@ class Guard:
     def show(self):
         return self.guard
 
+    def get_region_num(self):
+        if self.max_value == '+':
+            return float('inf')
+        right = self.get_max()
+        closed_max = 0 if self.get_closed_max() else 1
+        left = self.get_min()
+        closed_min = 0 if self.get_closed_min() else 1
+        region_num = 2 * (right - left) + 1 - closed_max - closed_min
+        return region_num
+
 
 # Merge guards
 def simple_guards(guards):
