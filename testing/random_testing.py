@@ -8,7 +8,7 @@ from common.TimedWord import TimedWord
 
 # 随机测试算法1 - 完全随机采样
 def random_testing_1(hypothesis, upper_guard, state_num, system):
-    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10
+    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10)
 
     ctx = None
     for i in range(test_num):
@@ -126,7 +126,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
 
 # 随机测试算法3 - 源自：Active Model Learning of Timed Automata via Genetic Programming
 def random_testing_3(hypothesis, upper_guard, state_num, system):
-    test_num = len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10
+    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10)
     n_len = int(state_num * 1.5)
     p_valid = 0.9
     p_delay = 0.6
