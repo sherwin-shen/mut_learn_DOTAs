@@ -5,6 +5,7 @@ from common.TimedWord import TimedWord
 from testing.random_testing import test_generation_2
 from common.hypothesis import OTATran, get_split_guards
 from common.TimeInterval import Guard
+from itertools import product
 
 
 class Mut(object):
@@ -32,13 +33,14 @@ class NFAMut(object):
 
 
 # 变异测试主函数
-def mutation_testing(hypothesisOTA, upper_guard, state_num, minimal_duration, system):
+def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
     equivalent = True
     ctx = None
 
     # 参数配置
     pretry = 0.9
     pstop = 0.02
+    minimal_duration = system.get_minimal_duration()  # It can also be set by the user.
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
     linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
@@ -65,10 +67,10 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, minimal_duration, sy
             print('state mutation', len(state_tests))
             equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
 
-    # # 当找不到反例的时候检测当前测试集是否找不到
-    # if equivalent:
-    #     temp_equivalent, temp_ctx = test_execution(hypothesisOTA, system, tests)
-    #     print(temp_equivalent, [i.show() for i in temp_ctx])
+    # 当找不到反例的时候检测当前测试集是否找不到
+    if equivalent:
+        temp_equivalent, temp_ctx = test_execution(hypothesisOTA, system, tests)
+        print(temp_equivalent, [i.show() for i in temp_ctx])
     return equivalent, ctx
 
 
@@ -182,17 +184,20 @@ def mutation_state(hypothesis, tests, nsel, guard_tests, state_num, minimal_dura
     Tsel = []
     # 生成变异体
     nacc = 10
-    mutations = mutant_generation_state(hypothesis_guard_split, nacc, state_num)
+    mutations = mutant_generation_state(hypothesis, nacc, state_num)
+    print('mutations', len(mutations))
     # 生成NFA
     # # mut由于数量较大，因此可进行一定的筛选
     # IMut_sample = mutant_sample(hypothesisOTA.states, mutations)
     IMut_sample = mutations
-    NFA_mut = NFA_mutant_state(hypothesis_guard_split, IMut_sample)
+    NFA_mut = NFA_mutant_state(hypothesis, IMut_sample, minimal_duration, upper_guard)
+    print('NFA_mut trans', len(NFA_mut.trans))
     # 变异分析 - pre_tests 与 cMuts 分别一一对应
     NFA_mut_tran_dict = get_tran_dict(NFA_mut)
     pre_tests = []
     cMuts = []
     IMutsel = []
+    print('mutation_analysis_state')
     for test in tests:
         cMut, IMutsel = mutation_analysis_state(test, NFA_mut, IMutsel, NFA_mut_tran_dict)
         if cMut:
@@ -233,7 +238,7 @@ def mutant_sample(states, mutations):
 
 
 # 生成NFA - state 变异
-def NFA_mutant_state(hypothesis, IMuts):
+def NFA_mutant_state(hypothesis, IMuts, minimal_duration, upper_guard):
     states = []
     s_state = [hypothesis.init_state]
     inputs = hypothesis.actions
@@ -246,22 +251,27 @@ def NFA_mutant_state(hypothesis, IMuts):
         trans.append([[ts.source], ts, [ts.target]])
     x = 0
     for mut in IMuts:
-        s = [x, mut.mId]
-        states.append(s)
-        x += 1
-        trans.append([[mut.location_pre], mut.action_pre, s])
-        v = mut.v_actions
-        j = 0
-        while j <= len(v) - 1:
-            ss = [x, mut.mId]
-            states.append(ss)
-            x += 1
-            trans.append([s, v[j], ss])
-            if j == len(v) - 1:
-                if ss not in f_states:
-                    f_states.append(ss)
-            s = ss
-            j += 1
+        cache_actions = []
+        # pre_action处理
+        pre_actions = split_action_guard(mut.action_pre, minimal_duration, upper_guard)
+        cache_actions.append(pre_actions)
+        # v_actions处理
+        for action in mut.v_actions:
+            actions = split_action_guard(action, minimal_duration, upper_guard)
+            cache_actions.append(actions)
+
+        trans_list = [trans for trans in product(*cache_actions)]
+        print([len(i) for i in cache_actions], len(trans_list))
+        for one_trans in trans_list:
+            init_state = [mut.location_pre]
+            cur_state = init_state
+            for tran in one_trans:
+                s = [x, mut.mId]
+                states.append(s)
+                x += 1
+                trans.append([cur_state, tran, s])
+                cur_state = s
+            f_states.append(cur_state)
     return NFAMut(states, s_state, inputs, trans, f_states)
 
 
@@ -378,6 +388,7 @@ def get_all_acc(hypothesis, state, state_num):
                     if path[-1].source == sn and path[-2].source == sn:
                         continue
                 get_next_tran(tran.target, copy.deepcopy(path) + [tran])
+        return True
 
     get_next_tran(hypothesis.init_state, [])
     return paths
@@ -397,11 +408,19 @@ def mut_split(s1, s2, hypothesis, mId):
     pI = ss1[len(ss1) - 1]
     Mutants = list()
     step = 1
-    Ik = get_Ik(hypothesis, s1[-1].target, step)
-    for distSeq in Ik:
+    if len(sqSuf_tran) < step:
+        Ik = get_Ik(hypothesis, s1[-1].target, step - len(sqSuf_tran))
+        for distSeq in Ik:
+            H = hypothesis
+            qpre = pI.source
+            v = sqSuf_tran + distSeq
+            M1 = Mut(H, qpre, pI, v, mId)
+            mId += 1
+            Mutants.append(M1)
+    else:
         H = hypothesis
         qpre = pI.source
-        v = sqSuf_tran + distSeq
+        v = sqSuf_tran
         M1 = Mut(H, qpre, pI, v, mId)
         mId += 1
         Mutants.append(M1)
@@ -467,3 +486,13 @@ def prefixes(tws):
         temp_tws = tws[:i]
         new_prefixes.append(temp_tws)
     return new_prefixes
+
+
+# 将迁移的guard分割
+def split_action_guard(tran, minimal_duration, upper_guard):
+    trans = []
+    for guard in tran.guards:
+        temp_guards = get_split_guards(guard, minimal_duration, upper_guard)
+        for temp_guard in temp_guards:
+            trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, tran.target))
+    return trans
