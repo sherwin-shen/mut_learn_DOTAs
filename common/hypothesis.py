@@ -40,18 +40,10 @@ class OTA(object):
             for tran in self.trans:
                 if tran.source == cur_state and tran.is_passing_tran(new_LTW):
                     cur_state = tran.target
-                    if tran.reset:
-                        now_time = 0
-                        reset = True
-                    else:
-                        now_time = time
-                        reset = False
-                    DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
+                    now_time = 0 if tran.reset else time
+                    DRTWs.append(ResetTimedWord(dtw.action, dtw.time, tran.reset))
                     break
-        if cur_state in self.accept_states:
-            value = 1
-        else:
-            value = 0
+        value = 1 if cur_state in self.accept_states else 0
         return DRTWs, value
 
     # build simple hypothesis - merge guards
@@ -143,7 +135,7 @@ class OTATran(object):
 def struct_discreteOTA(table, actions):
     states = []
     trans = []
-    init_state = ''
+    init_state = None
     accept_states = []
     # deal with states
     values_name_dict = {}

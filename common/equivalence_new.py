@@ -1,4 +1,4 @@
-# 模型结构转换为Jie An的模型
+# 模型结构转换为https://github.com/Leslieaj/OTALearning中的模型
 # model equivalence checking —— the model is COTA(complete OTA), in other words, hypothesis
 from common.TimeInterval import Guard
 from common.TimedWord import TimedWord

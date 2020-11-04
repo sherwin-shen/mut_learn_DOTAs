@@ -6,9 +6,9 @@ from smart_learning.teacher import EQs
 
 def learnOTA_smart(system, debug_flag):
     actions = system.actions
-    upper_guard = system.max_time_value()  # 可以由用户根据先验知识自己设置
-    minimal_duration = system.get_minimal_duration()  # 可以由用户根据先验知识自己设置
-    state_num = len(system.states)  # 非必须
+    upper_guard = system.max_time_value()  # It can also be set by the user.
+    minimal_duration = system.get_minimal_duration()  # It can also be set by the user.
+    state_num = len(system.states)  # non-essential
 
     ### init Table
     table = obsTable.initTable(actions, system)
@@ -60,7 +60,6 @@ def learnOTA_smart(system, debug_flag):
             hypothesisOTA.show_OTA()
 
         ### EQs
-        hypothesisOTA = hypothesisOTA.build_simple_hypothesis()
         equivalent, ctx = EQs(hypothesisOTA, upper_guard, state_num, minimal_duration, system)
 
         if not equivalent:
@@ -77,6 +76,6 @@ def learnOTA_smart(system, debug_flag):
                 print("***************** New-Table" + str(table_num) + " is as follow *******************")
                 table.show()
         else:
-            learned_system = copy.deepcopy(hypothesisOTA).build_simple_hypothesis()
+            learned_system = copy.deepcopy(hypothesisOTA)
 
     return learned_system, system.mq_num, system.eq_num, system.test_num, system.test_num_cache, table_num

@@ -75,8 +75,8 @@ if __name__ == '__main__':
     random.seed(3)
 
     ### file directory
-    # file_path = sys.argv[1]
-    model_file = "benchmarks/3_2_10/3_2_10-6.json"
+    # model_file = sys.argv[1]
+    model_file = "benchmarks/3_2_10/3_2_10-7.json"
 
     ### teacher type - smart_teacher / normal_teacher
     # teacher_type = sys.argv[2]

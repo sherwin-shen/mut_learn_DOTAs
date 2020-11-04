@@ -23,8 +23,7 @@ class System(object):
         temp_DTWs = tuple(DTWs)
         if temp_DTWs in self.cache:
             return self.cache[temp_DTWs][0], self.cache[temp_DTWs][1]
-        else:
-            self.test_num_cache += 1
+        self.test_num_cache += 1
         DRTWs = []
         now_time = 0
         cur_state = self.init_state
@@ -36,13 +35,8 @@ class System(object):
                 if tran.source == cur_state and tran.is_passing_tran(new_LTW):
                     flag = True
                     cur_state = tran.target
-                    if tran.reset:
-                        now_time = 0
-                        reset = True
-                    else:
-                        now_time = time
-                        reset = False
-                    DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
+                    now_time = 0 if tran.reset else time
+                    DRTWs.append(ResetTimedWord(dtw.action, dtw.time, tran.reset))
                     break
             if not flag:
                 cur_state = cur_state
@@ -127,12 +121,13 @@ class System(object):
 
     # Get the minimal duration of a (finite) time guard
     def get_minimal_duration(self):
-        complete_system = build_canonicalOTA(copy.deepcopy(self))
         res = float('inf')
-        for tran in complete_system.trans:
+        for tran in self.trans:
             for guard in tran.guards:
                 if guard.get_region_num() < res:
                     res = guard.get_region_num()
+        if res == float('inf'):
+            res = 1
         return res
 
 
