@@ -4,8 +4,8 @@ import random
 import json
 import time
 from common.system import build_system
-from smart_learning.learnOTA import learnOTA_smart
 from common.make_pic import make_system, make_hypothesis
+from smart_learning.learnOTA import learnOTA_smart
 from common.validate import validate
 
 
@@ -40,10 +40,10 @@ def main():
         correct_flag, passing_rate = validate(learned_system, system)
         print("Total time of learning: " + str(end_time - start_time))
         print("Total number of MQs (no-cache): " + str(mq_num))
-        print("Total number of EQs (no-cache): " + str(eq_num))
+        print("Total number of EQs: " + str(eq_num))
         print("Total number of tests (no-cache): " + str(test_num))
         print("Total number of tests (with-cache): " + str(test_num_cache))
-        print("Total number of tables explored (no-cache): " + str(table_num))
+        print("Total number of tables explored: " + str(table_num))
         print("Completely correct: " + str(correct_flag) + "   Testing pass rate: " + str(passing_rate))
         print("*********** learning ending  *************")
         trans = []
@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     ### file directory
     # model_file = sys.argv[1]
-    model_file = "benchmarks/3_2_10/3_2_10-1.json"
+    model_file = "benchmarks/3_2_10/3_2_10-2.json"
 
     ### teacher type - smart_teacher / normal_teacher
     # teacher_type = sys.argv[2]

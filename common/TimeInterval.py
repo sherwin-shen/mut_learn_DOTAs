@@ -186,9 +186,6 @@ class Guard:
         else:
             return False
 
-    def show(self):
-        return self.guard
-
     def get_region_num(self):
         if self.max_value == '+':
             return float('inf')
@@ -198,6 +195,9 @@ class Guard:
         closed_min = 0 if self.get_closed_min() else 1
         region_num = 2 * (right - left) + 1 - closed_max - closed_min
         return region_num
+
+    def show(self):
+        return self.guard
 
 
 # Merge guards
@@ -234,3 +234,44 @@ def sort_guards(guards):
             if guards[j].max_bn > guards[j + 1].max_bn:
                 guards[j], guards[j + 1] = guards[j + 1], guards[j]
     return guards
+
+
+# guard按照minimal_duration进行切分，直到超过upper_guard
+def guard_split(guard, step, upper_guard):
+    temp_guards = []
+    min_value = guard.get_min()
+    closed_min = '[' if guard.get_closed_min() else '('
+    max_value = guard.get_max()
+    closed_max = ']' if guard.get_closed_max() else ')'
+    if min_value >= upper_guard:
+        return [guard]
+    while min_value < upper_guard and min_value < max_value:
+        if closed_min == '(' and step % 2 != 0:
+            temp_max = min_value + (step + 1) / 2
+        elif closed_min == '(' and step % 2 == 0:
+            temp_max = min_value + step / 2
+        elif closed_min == '[' and step % 2 != 0:
+            temp_max = min_value + (step - 1) / 2
+        else:
+            temp_max = min_value + step / 2
+
+        if temp_max >= upper_guard or temp_max >= max_value:
+            break
+
+        if closed_min == '(' and step % 2 != 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
+            closed_min = '['
+        elif closed_min == '(' and step % 2 == 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
+            closed_min = '('
+        elif closed_min == '[' and step % 2 != 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
+            closed_min = '('
+        else:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
+            closed_min = '['
+        min_value = temp_max
+    if max_value == float('inf'):
+        max_value = '+'
+    temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(max_value) + closed_max))
+    return temp_guards

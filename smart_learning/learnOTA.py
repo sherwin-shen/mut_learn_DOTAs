@@ -57,7 +57,6 @@ def learnOTA_smart(system, debug_flag):
             hypothesisOTA.show_OTA()
 
         ### EQs
-
         equivalent, ctx = EQs(hypothesisOTA, system)
 
         if not equivalent:
