@@ -48,3 +48,16 @@ def make_full_hypothesis(data, filePath, fileName):
         dot.edge(str(tran.source), str(tran.target), tranLabel)
     newFilePath = filePath + fileName
     dot.render(newFilePath, view=True)
+
+
+# NFA
+def make_NFA(data, filePath, fileName):
+    dot = Digraph()
+    states = data.states
+    for s in states:
+        dot.node(name=str(s), label=str(s))
+    for tran in data.trans:
+        tranLabel = " " + str(tran.action) + " " + tran.show_guards() + " " + str(tran.reset)
+        dot.edge(str(tran.source), str(tran.target), tranLabel)
+    newFilePath = filePath + fileName
+    dot.render(newFilePath, view=True)

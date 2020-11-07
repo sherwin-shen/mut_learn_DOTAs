@@ -195,8 +195,13 @@ def split_state_mutation_generation(hypothesis, nacc, k, state_num, region_num, 
                         temp_mutations.extend(muts)
     for temp_mut in temp_mutations:
         cache_trans = []
-        for tran in temp_mut:
-            new_trans = split_tran_guard(tran, region_num, upper_guard)
+        for i in range(len(temp_mut)):
+            if i == 0:
+                new_trans = split_tran_guard(temp_mut[i], region_num, upper_guard)
+            elif i >= len(temp_mut) - k:
+                new_trans = split_tran_guard(temp_mut[i], region_num, upper_guard)
+            else:
+                new_trans = [temp_mut[i]]
             cache_trans.append(new_trans)
         trans_list = [new_trans for new_trans in product(*cache_trans)]
         mutations.extend(trans_list)
