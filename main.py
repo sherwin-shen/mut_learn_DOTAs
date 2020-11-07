@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     ### file directory
     # model_file = sys.argv[1]
-    model_file = "benchmarks/3_2_10/3_2_10-10.json"
+    model_file = "benchmarks/3_2_10/3_2_10-3.json"
 
     ### teacher type - smart_teacher / normal_teacher
     # teacher_type = sys.argv[2]
