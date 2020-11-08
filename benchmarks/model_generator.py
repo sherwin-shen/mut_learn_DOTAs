@@ -92,14 +92,29 @@ def get_trans_from_curState(source, tran_id, states, inputs, guard_upper_bound, 
     return trans, reach_states, cur_tran_id
 
 
-def get_random_guards(guard_upper_bound, partition_size):
-    guards = []
+def get_endpoint_list(guard_upper_bound, partition_size):
     endpoint_set = {0}
     while len(endpoint_set) < partition_size:
         endpoint = random.randint(0, guard_upper_bound - 1)
         endpoint_set.add(endpoint)
     endpoint_list = list(endpoint_set)
     endpoint_list.sort()
+    return endpoint_list
+
+
+def check_endpoint_list(endpoint_list):
+    for i in range(len(endpoint_list)):
+        if i < len(endpoint_list) - 1:
+            if endpoint_list[i + 1] - endpoint_list[i] < 2:
+                return False
+    return True
+
+
+def get_random_guards(guard_upper_bound, partition_size):
+    guards = []
+    endpoint_list = get_endpoint_list(guard_upper_bound, partition_size)
+    while not check_endpoint_list(endpoint_list):
+        endpoint_list = get_endpoint_list(guard_upper_bound, partition_size)
     endpoint_list.append('+')
     right = None
     for i in range(len(endpoint_list) - 1):
