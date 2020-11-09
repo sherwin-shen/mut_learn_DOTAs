@@ -4,18 +4,20 @@ from common.TimedWord import TimedWord, ResetTimedWord
 
 
 class OTA(object):
-    def __init__(self, actions, states, trans, init_state, accept_states):
+    def __init__(self, actions, states, trans, init_state, accept_states, sink_state):
         self.actions = actions
         self.states = states
         self.trans = trans
         self.init_state = init_state
         self.accept_states = accept_states
+        self.sink_state = sink_state
 
     def show_discreteOTA(self):
         print("Actions: " + str(self.actions))
         print("States: " + str(self.states))
         print("InitState: {}".format(self.init_state))
         print("AcceptStates: {}".format(self.accept_states))
+        print("SinkState: {}".format(self.sink_state))
         print("Transitions: ")
         for t in self.trans:
             print(' ' + str(t.tran_id), 'S_' + str(t.source), str(t.action), str(t.time_point), str(t.reset), 'S_' + str(t.target), end="\n")
@@ -25,6 +27,7 @@ class OTA(object):
         print("States: " + str(self.states))
         print("InitState: {}".format(self.init_state))
         print("AcceptStates: {}".format(self.accept_states))
+        print("SinkState: {}".format(self.sink_state))
         print("Transitions: ")
         for t in self.trans:
             print("  " + str(t.tran_id), 'S_' + str(t.source), str(t.action), t.show_guards(), str(t.reset), 'S_' + str(t.target), end="\n")
@@ -35,15 +38,28 @@ class OTA(object):
         now_time = 0
         cur_state = self.init_state
         for dtw in DTWs:
-            time = dtw.time + now_time
-            new_LTW = TimedWord(dtw.action, time)
-            for tran in self.trans:
-                if tran.source == cur_state and tran.is_passing_tran(new_LTW):
-                    cur_state = tran.target
-                    now_time = 0 if tran.reset else time
-                    DRTWs.append(ResetTimedWord(dtw.action, dtw.time, tran.reset))
-                    break
-        value = 1 if cur_state in self.accept_states else 0
+            if cur_state == self.sink_state:
+                DRTWs.append(ResetTimedWord(dtw.action, dtw.time, True))
+            else:
+                time = dtw.time + now_time
+                new_LTW = TimedWord(dtw.action, time)
+                for tran in self.trans:
+                    if tran.source == cur_state and tran.is_passing_tran(new_LTW):
+                        cur_state = tran.target
+                        if tran.reset:
+                            now_time = 0
+                            reset = True
+                        else:
+                            now_time = time
+                            reset = False
+                        DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
+                        break
+        if cur_state in self.accept_states:
+            value = 1
+        elif cur_state == self.sink_state:
+            value = -1
+        else:
+            value = 0
         return DRTWs, value
 
     # build simple hypothesis - merge guards
@@ -52,6 +68,7 @@ class OTA(object):
         states = self.states
         init_state = self.init_state
         accept_states = self.accept_states
+        sink_state = self.sink_state
         trans = []
         tran_num = 0
         for s in self.states:
@@ -69,7 +86,7 @@ class OTA(object):
                             guards = simple_guards(guards)
                             trans.append(OTATran(tran_num, s, action, guards, reset, t))
                             tran_num += 1
-        return OTA(actions, states, trans, init_state, accept_states)
+        return OTA(actions, states, trans, init_state, accept_states, sink_state)
 
     # Get the max time value constant appearing in OTA.
     def max_time_value(self):
@@ -83,18 +100,6 @@ class OTA(object):
                 if max_time_value < temp_max_value:
                     max_time_value = temp_max_value
         return max_time_value
-
-    # 将hypothesis的guard按照minimal_duration切分
-    def guard_split(self, minimal_duration, upper_guard):
-        new_trans = []
-        tran_id = 0
-        for tran in self.trans:
-            for guard in tran.guards:
-                temp_guards = guard_split(guard, minimal_duration, upper_guard)
-                for temp_guard in temp_guards:
-                    new_trans.append(OTATran(tran_id, tran.source, tran.action, [temp_guard], tran.reset, tran.target))
-                    tran_id += 1
-        return OTA(self.actions, self.states, new_trans, self.init_state, self.accept_states)
 
 
 class DiscreteOTATran(object):
@@ -137,6 +142,7 @@ def struct_discreteOTA(table, actions):
     trans = []
     init_state = None
     accept_states = []
+    sink_state = None
     # deal with states
     values_name_dict = {}
     for s, i in zip(table.S, range(0, len(table.S))):
@@ -147,6 +153,8 @@ def struct_discreteOTA(table, actions):
             init_state = state_name
         if s.values[0] == 1:
             accept_states.append(state_name)
+        if s.values[0] == -1:
+            sink_state = state_name
     # deal with trans
     trans_num = 0
     table_elements = [s for s in table.S] + [r for r in table.R]
@@ -180,7 +188,7 @@ def struct_discreteOTA(table, actions):
             temp_tran = DiscreteOTATran(trans_num, source, action, time_point, reset, target)
             trans.append(temp_tran)
             trans_num = trans_num + 1
-    return OTA(actions, states, trans, init_state, accept_states)
+    return OTA(actions, states, trans, init_state, accept_states, sink_state)
 
 
 def struct_hypothesisOTA(discreteOTA):
@@ -223,7 +231,7 @@ def struct_hypothesisOTA(discreteOTA):
                     guards.append(tempGuard)
                 for guard in guards:
                     trans.append(OTATran(tran.tran_id, tran.source, tran.action, [guard], tran.reset, tran.target))
-    return OTA(discreteOTA.actions, discreteOTA.states, trans, discreteOTA.init_state, discreteOTA.accept_states).build_simple_hypothesis()
+    return OTA(discreteOTA.actions, discreteOTA.states, trans, discreteOTA.init_state, discreteOTA.accept_states, discreteOTA.sink_state).build_simple_hypothesis()
 
 
 # --------------------------------- auxiliary function ---------------------------------

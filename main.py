@@ -64,6 +64,7 @@ def main():
                 "states": learned_system.states,
                 "initState": learned_system.init_state,
                 "acceptStates": learned_system.accept_states,
+                "sinkState": learned_system.sink_state,
                 "trans": trans
             }
         }

@@ -1,7 +1,7 @@
 from copy import deepcopy
-from common.equivalence_new import equivalence
-from common.system import build_canonicalOTA
+from common.equivalence import equivalence
 from testing.random_testing import test_generation_1
+from common.system import build_canonicalOTA
 
 
 def validate(learned_system, system):

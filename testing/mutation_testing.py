@@ -9,11 +9,12 @@ from common.TimeInterval import Guard, guard_split
 
 
 class NFA(object):
-    def __init__(self, states, init_state, actions, trans, final_states):
+    def __init__(self, states, init_state, actions, trans, sink_state, final_states):
         self.states = states
         self.init_state = init_state
         self.actions = actions
         self.trans = trans
+        self.sink_state = sink_state
         self.final_states = final_states
 
 
@@ -28,6 +29,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
     linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
+
     # 参数配置 - 变异相关
     region_num = system.get_minimal_duration()  # It can also be set by the user.
     nacc = 8
@@ -109,6 +111,8 @@ def timed_mutation_generation(hypothesis, region_num, upper_guard, k):
     mutations = []
     new_trans = []
     for tran in hypothesis.trans:
+        if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
+            continue
         for guard in tran.guards:
             guard_min = guard.get_min()
             guard_max = guard.get_max()
@@ -192,6 +196,8 @@ def split_state_mutation_generation(hypothesis, nacc, k, state_num, region_num, 
     mutations = []
     temp_mutations = []
     for state in hypothesis.states:
+        if state == hypothesis.sink_state:
+            continue
         set_accq = get_all_acc(hypothesis, state, state_num)
         if len(set_accq) < 2:
             continue
@@ -272,6 +278,8 @@ def tran_mutation_generation(hypothesis, k, region_num, upper_guard):
     for state in hypothesis.states:
         step_trans_dict[state] = k_step_trans(hypothesis, state, k)
     for tran in hypothesis.trans:
+        if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
+            continue
         trans = split_tran_guard_remove_first(tran, region_num, upper_guard)
         for state in hypothesis.states:
             if state != tran.target:
@@ -290,6 +298,7 @@ def NFA_generation(mutations, hypothesis):
     init_state = hypothesis.init_state
     actions = hypothesis.actions
     trans = hypothesis.trans
+    sink_state = hypothesis.sink_state
     final_states = []
     mId = 0
     for mutation in mutations:
@@ -307,7 +316,7 @@ def NFA_generation(mutations, hypothesis):
             source_state = target_state
         mId += 1
         final_states.append(target_state)
-    return NFA(states, init_state, actions, trans, final_states)
+    return NFA(states, init_state, actions, trans, sink_state, final_states)
 
 
 # mutation analysis for single test using NFA-based mutant representation
@@ -334,6 +343,8 @@ def mutation_analysis(muts_NFA, test, C, tran_dict):
                         C_test.append(mId)
                     if mId not in C:
                         C.append(mId)
+                if tran.target == muts_NFA.sink_state:
+                    continue
                 tree_create(tran.target, tempTime, test_index + 1)
 
     tree_create(muts_NFA.init_state, 0, 0)
@@ -434,7 +445,7 @@ def get_all_acc(hypothesis, state, state_num):
     max_path_length = min(int(len(hypothesis.states) * 1.5), state_num * 1.5)
 
     def get_next_tran(sn, path):
-        if len(path) > max_path_length:
+        if len(path) > max_path_length or sn == hypothesis.sink_state:
             return True
         if sn == state and path:
             if path not in paths:
@@ -443,9 +454,6 @@ def get_all_acc(hypothesis, state, state_num):
             if tran.source == sn:
                 if len(path) > 0 and tran == path[-1]:
                     continue
-                if len(path) > 1 and tran.target == sn:
-                    if path[-1].source == sn and path[-2].source == sn:
-                        continue
                 get_next_tran(tran.target, copy.deepcopy(path) + [tran])
 
     get_next_tran(hypothesis.init_state, [])

@@ -1,4 +1,4 @@
-from testing.random_testing import random_testing_1, random_testing_2, random_testing_3
+from testing.random_testing import random_testing_1, random_testing_2
 from testing.mutation_testing import mutation_testing
 from common.TimedWord import TimedWord, LRTW_to_LTW, DRTW_to_LRTW
 import copy

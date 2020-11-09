@@ -124,71 +124,6 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
     return test
 
 
-# 随机测试算法3 - 源自：Active Model Learning of Timed Automata via Genetic Programming
-def random_testing_3(hypothesis, upper_guard, state_num, system):
-    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10)
-    n_len = int(state_num * 1.5)
-    p_valid = 0.9
-    p_delay = 0.6
-
-    ctx = None
-    for i in range(test_num):
-        test = test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard)
-        test_list = prefixes(test)
-        for j in test_list:
-            flag = test_execution(hypothesis, system, j)
-            if flag:
-                ctx = test
-                return False, ctx
-    return True, ctx
-
-
-# 测试集生成方法（随机测试算法3）
-def test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard):
-    test = []
-    state_now = hypothesis.init_state
-    time_now = 0
-    while len(test) < n_len:
-        transition = None
-        delay = get_random_delay(upper_guard)
-        transition_list = get_transition_list(hypothesis, state_now)
-        if random.random() <= p_valid:
-            if random.random() <= p_delay:
-                delay_list = get_delay_list(transition_list)
-                if len(delay_list) > 0:
-                    delay = random.choice(delay_list)
-            cur_time = time_now + delay
-            transition_valid_list = []
-            for tran in transition_list:
-                for guard in tran.guards:
-                    if guard.is_in_interval(cur_time):
-                        if tran.target != tran.source or tran.reset:
-                            transition_valid_list.append(tran)
-                            break
-            if len(transition_valid_list) > 0:
-                transition = random.choice(transition_valid_list)
-
-        if transition is None:
-            cur_time = time_now + delay
-            transition_valid_list = []
-            for tran in transition_list:
-                if tran.target == tran.source and not tran.reset:
-                    for guard in tran.guards:
-                        if guard.is_in_interval(cur_time):
-                            transition_valid_list.append(tran)
-                            break
-            if len(transition_valid_list) > 0:
-                transition = random.choice(transition_valid_list)
-        if transition is not None:
-            test.append(TimedWord(transition.action, delay))
-            if transition.reset:
-                time_now = 0
-            else:
-                time_now = time_now + delay
-            state_now = transition.target
-    return test
-
-
 # 测试执行
 def test_execution(hypothesis, system, sample):
     system_res, real_value = system.test_DTWs(sample)
@@ -242,32 +177,6 @@ def get_random_delay(upper_guard):
     else:
         time = time // 2 + 0.5
     return time
-
-
-def get_transition_list(hypothesis, state_now):
-    transition_list = []
-    for tran in hypothesis.trans:
-        if tran.source == state_now:
-            transition_list.append(tran)
-    return transition_list
-
-
-def get_delay_list(transition_list):
-    delay_list = []
-    for transition in transition_list:
-        for guard in transition.guards:
-            left = guard.guard.split(',')[0]
-            right = guard.guard.split(',')[1]
-            if left[0] == '(':
-                delay_list.append(guard.get_min() + 0.5)
-            else:
-                delay_list.append(guard.get_min())
-            if right[-1] == ']':
-                delay_list.append(guard.get_max())
-            else:
-                if right[0] != '+':
-                    delay_list.append(guard.get_max() - 0.5)
-    return delay_list
 
 
 # prefix set of tws （tws前缀集）

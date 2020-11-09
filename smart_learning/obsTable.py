@@ -84,7 +84,7 @@ class ObsTable(object):
 class Element(object):
     def __init__(self, LRTWs, values, suffixes_resets):
         self.LRTWs = LRTWs
-        self.values = values
+        self.values = values  # [value]
         self.suffixes_resets = suffixes_resets
 
 
@@ -94,7 +94,7 @@ def initTable(actions, system):
     # deal with E
     table.E.append([])
     # deal with S
-    element = fill_table_row([], table, system)
+    element = fill_table_row([], table, False, system)
     table.S.append(element)
     # deal with R
     table = extend_R(table.S[0], actions, table, system)
@@ -117,15 +117,25 @@ def make_closed(table, actions, close_move, system):
 def make_consistent(table, consistent_add, system):
     table.E.append(consistent_add)
     for i in range(0, len(table.S)):
-        LTWs = LRTW_to_LTW(table.S[i].LRTWs) + consistent_add
-        LRTWs, value = TQs(LTWs, system)
-        table.S[i].values.append(value)
-        table.S[i].suffixes_resets.append(get_resets(LRTWs, consistent_add))
+        if is_valid(table.S[i].LRTWs):
+            LTWs = LRTW_to_LTW(table.S[i].LRTWs) + consistent_add
+            LRTWs, value = TQs(LTWs, system)
+            temp_value = value
+            table.S[i].values.append(temp_value)
+            table.S[i].suffixes_resets.append(get_resets(LRTWs, consistent_add))
+        else:
+            table.S[i].values.append(-1)
+            table.S[i].suffixes_resets.append([True] * len(consistent_add))
     for j in range(0, len(table.R)):
-        LTWs = LRTW_to_LTW(table.R[j].LRTWs) + consistent_add
-        LRTWs, value = TQs(LTWs, system)
-        table.R[j].values.append(value)
-        table.R[j].suffixes_resets.append(get_resets(LRTWs, consistent_add))
+        if is_valid(table.R[j].LRTWs):
+            LTWs = LRTW_to_LTW(table.R[j].LRTWs) + consistent_add
+            LRTWs, value = TQs(LTWs, system)
+            temp_value = value
+            table.R[j].values.append(temp_value)
+            table.R[j].suffixes_resets.append(get_resets(LRTWs, consistent_add))
+        else:
+            table.R[j].values.append(-1)
+            table.R[j].suffixes_resets.append([True] * len(consistent_add))
     return table
 
 
@@ -142,7 +152,7 @@ def deal_ctx(table, ctx, system):
                 need_add_flag = False
                 break
         if need_add_flag:
-            temp_element = fill_table_row(LRTWs, table, system)
+            temp_element = fill_table_row(LRTWs, table, False, system)
             table.R.append(temp_element)
     return table
 
@@ -176,21 +186,38 @@ def delete_prefix(tws, pre):
 
 
 # Expand into a row according to s (根据s扩充成一行)
-def fill_table_row(LRTWs, table, system):
-    values = []
-    suffixes_resets = []
-    for e in table.E:
-        LTWs = LRTW_to_LTW(LRTWs) + e
-        tempLRTWs, tempValue = TQs(LTWs, system)
-        if len(e) != 0:
-            resetList = get_resets(tempLRTWs, e)
-            value = tempValue
+def fill_table_row(LRTWs, table, flag, system):
+    # flag判断是否进入Error状态或查询是否有效 - flag为True表示已进入Error状态或无效
+    if flag:
+        values = [-1] * len(table.E)
+        system.mq_num += len(table.E)
+        suffixes_resets = []
+        for e in table.E:
+            value = [True] * len(e)
+            suffixes_resets.append(value)
+        element = Element(LRTWs, values, suffixes_resets)
+    else:
+        values = []
+        suffixes_resets = []
+        if is_valid(LRTWs):
+            for e in table.E:
+                LTWs = LRTW_to_LTW(LRTWs) + e
+                tempLRTWs, tempValue = TQs(LTWs, system)
+                if len(e) != 0:
+                    resetList = get_resets(tempLRTWs, e)
+                    value = tempValue
+                else:
+                    resetList = []
+                    value = tempValue
+                values.append(value)
+                suffixes_resets.append(resetList)
         else:
-            resetList = []
-            value = tempValue
-        suffixes_resets.append(resetList)
-        values.append(value)
-    element = Element(LRTWs, values, suffixes_resets)
+            for e in table.E:
+                value = [True] * len(e)
+                suffixes_resets.append(value)
+            values = [-1] * len(table.E)
+            system.mq_num += len(table.E)
+        element = Element(LRTWs, values, suffixes_resets)
     return element
 
 
@@ -201,19 +228,30 @@ def extend_R(s, actions, table, system):
         LTWs = LRTW_to_LTW(s.LRTWs) + [TimedWord(action, 0)]
         LRTWs, value = TQs(LTWs, system)
         system.mq_num -= 1
-        if LRTWs not in table_LRTWS:
-            element = fill_table_row(LRTWs, table, system)
+        if value == -1:
+            element = fill_table_row(LRTWs, table, True, system)
+        else:
+            element = fill_table_row(LRTWs, table, False, system)
+        if element.LRTWs not in table_LRTWS:
             table.R.append(element)
     return table
 
 
-# get corresponding resetList in e (获得E中对应的resetList)
-def get_resets(LRTWs, e):
-    resets = []
-    temp_LRTWs = LRTWs[-len(e):]
-    for i in temp_LRTWs:
-        resets.append(i.reset)
-    return resets
+# determine whether LRTWs are valid （LRTWs是否有效）
+def is_valid(LRTWs):
+    if not LRTWs:
+        return True
+    else:
+        nowTime = 0
+        for lrtw in LRTWs:
+            if lrtw.time >= nowTime:
+                if lrtw.reset:
+                    nowTime = 0
+                else:
+                    nowTime = lrtw.time
+            else:
+                return False
+        return True
 
 
 # prefix set of tws （tws前缀集）
@@ -235,3 +273,12 @@ def normalize(trace):
             time = math.modf(float(i.time))[1] + 0.5
         new_trace.append(ResetTimedWord(i.action, time, i.reset))
     return new_trace
+
+
+# get corresponding resetList in e (获得E中对应的resetList)
+def get_resets(LRTWs, e):
+    resets = []
+    temp_LRTWs = LRTWs[-len(e):]
+    for i in temp_LRTWs:
+        resets.append(i.reset)
+    return resets
