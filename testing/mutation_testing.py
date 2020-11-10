@@ -2,7 +2,7 @@ import math
 import copy
 import random
 from itertools import product
-from testing.random_testing import test_generation_2
+from testing.random_testing import test_generation_2, test_generation_4
 from common.hypothesis import OTATran
 from common.TimedWord import TimedWord
 from common.TimeInterval import Guard, guard_split
@@ -26,6 +26,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
     # 参数配置 - 测试生成
     pretry = 0.9
     pstop = 0.02
+    pvalid = 0.8
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
     linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
@@ -39,7 +40,8 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
     # 测试集生成
     tests = []
     for i in range(test_num):
-        tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
+        # tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
+        tests.append(test_generation_4(hypothesisOTA, pretry, pstop, max_steps, pvalid, upper_guard))
 
     tested = []  # 缓存已测试序列
     # step1: timed变异
