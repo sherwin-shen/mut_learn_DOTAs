@@ -216,6 +216,92 @@ def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard)
     return test
 
 
+# 随机测试算法4 - 改自随机测试算法2
+def random_testing_4(hypothesis, upper_guard, state_num, system):
+    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 5)
+    pretry = 0.9
+    pstop = 0.02
+    pvalid = 0.8
+    max_steps = int(1.5 * state_num)
+
+    ctx = None
+    for i in range(test_num):
+        test = test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard)
+
+        test_list = prefixes(test)
+        for j in test_list:
+            flag = test_execution(hypothesis, system, j)
+            if flag:
+                ctx = test
+                return False, ctx
+    return True, ctx
+
+
+# 测试集生成方法
+def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard):
+    hypothesis = copy.deepcopy(hypothesis)
+    test = []
+    # 将迁移按照状态/有效性进行分组
+    invalid_tran_dict = {}
+    valid_tran_dict = {}
+    for state in hypothesis.states:
+        invalid_tran_dict[state] = []
+        valid_tran_dict[state] = []
+    for tran in hypothesis.trans:
+        if tran.source == tran.target and not tran.reset:
+            invalid_tran_dict[tran.source].append(tran)
+        else:
+            valid_tran_dict[tran.source].append(tran)
+    # 开始随机游走
+    state = hypothesis.init_state
+    now_time = 0
+    while True:
+        if coin_flip(pvalid):
+            if valid_tran_dict[state]:
+                next_tran = random.choice(valid_tran_dict[state])
+                delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
+                if delay_time is None:
+                    continue
+                test.append(TimedWord(next_tran.action, delay_time))
+                state = next_tran.target
+                if next_tran.reset:
+                    now_time = 0
+                else:
+                    now_time += delay_time
+            else:
+                continue
+        else:
+            if invalid_tran_dict[state]:
+                next_tran = random.choice(invalid_tran_dict[state])
+                delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
+                if delay_time is None:
+                    continue
+                test.append(TimedWord(next_tran.action, delay_time))
+                state = next_tran.target
+                if next_tran.reset:
+                    now_time = 0
+                else:
+                    now_time += delay_time
+            else:
+                continue
+        if len(test) > max_steps:
+            break
+        elif coin_flip(pstop):
+            break
+
+    # 是否多走几步
+    if coin_flip(0.8):
+        target_state = random.choice(hypothesis.states)
+        while True:
+            path_dtw, now_time = find_path(hypothesis, upper_guard, now_time, state, target_state)
+            if path_dtw:
+                test.extend(path_dtw)
+                break
+            elif coin_flip(1 - pretry):
+                break
+    return test
+
+
 # 测试执行
 def test_execution(hypothesis, system, sample):
     system_res, real_value = system.test_DTWs(sample)
