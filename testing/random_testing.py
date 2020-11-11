@@ -38,7 +38,7 @@ def test_generation_1(actions, upper_guard, state_num):
 def random_testing_2(hypothesis, upper_guard, state_num, system):
     test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10)
     pretry = 0.9
-    pstop = 0.02
+    pstop = 0.1
     linfix = min(math.ceil(len(hypothesis.states) / 2), math.ceil(state_num / 2))
     max_steps = int(1.5 * state_num)
 
@@ -56,11 +56,11 @@ def random_testing_2(hypothesis, upper_guard, state_num, system):
 
 # 测试集生成方法（随机测试算法2）
 def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard):
-    hypothesis = copy.deepcopy(hypothesis)
     test = []
-    state = hypothesis.init_state
+    hypothesis = copy.deepcopy(hypothesis)
     li = random.randint(1, linfix)
     now_time = 0
+    state = hypothesis.init_state
     if coin_flip(0.5):
         actions = []
         for i in range(li):
@@ -80,21 +80,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
                     break
     while True:
         rS = random.choice(hypothesis.states)
-        rI = random.choice(hypothesis.actions)
-        time = get_random_delay(upper_guard)
-        rI_temp_DTW = TimedWord(rI, time)
-        rI_temp_LTW = TimedWord(rI, now_time + time)
-        for t in hypothesis.trans:
-            if t.source == rS and t.is_passing_tran(rI_temp_LTW):
-                state = t.target
-                if t.reset:
-                    now_time = 0
-                else:
-                    now_time = rI_temp_LTW.time
-                break
-
         p0, now_time = find_path(hypothesis, upper_guard, now_time, state, rS)
-
         if p0:
             li = random.randint(1, linfix)
             rSteps_i = []
@@ -114,7 +100,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
                         else:
                             now_time = rsi_temp_LTW.time
                         break
-            test = test + p0 + [rI_temp_DTW] + rSteps
+            test = test + p0 + rSteps
             if len(test) > max_steps:
                 break
             elif coin_flip(pstop):
@@ -124,17 +110,84 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
     return test
 
 
-# 随机测试算法4 - 改进自2
-def random_testing_4(hypothesis, upper_guard, state_num, system):
+# 随机测试算法3 - 源自：Active Model Learning of Timed Automata via Genetic Programming
+def random_testing_3(hypothesis, upper_guard, state_num, system):
     test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10)
+    n_len = int(state_num * 2)
+    p_valid = 0.9
+    p_delay = 0.6
+
+    ctx = None
+    for i in range(test_num):
+        test = test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard)
+        test_list = prefixes(test)
+        for j in test_list:
+            flag = test_execution(hypothesis, system, j)
+            if flag:
+                ctx = test
+                return False, ctx
+    return True, ctx
+
+
+# 测试集生成方法（随机测试算法3）
+def test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard):
+    test = []
+    state_now = hypothesis.init_state
+    time_now = 0
+    while len(test) < n_len:
+        transition = None
+        delay = get_random_delay(upper_guard)
+        transition_list = get_transition_list(hypothesis, state_now)
+        if random.random() <= p_valid:
+            if random.random() <= p_delay:
+                delay_list = get_delay_list(transition_list)
+                if len(delay_list) > 0:
+                    delay = random.choice(delay_list)
+            cur_time = time_now + delay
+            transition_valid_list = []
+            for tran in transition_list:
+                for guard in tran.guards:
+                    if guard.is_in_interval(cur_time):
+                        if tran.target != tran.source or tran.reset:
+                            transition_valid_list.append(tran)
+                            break
+            if len(transition_valid_list) > 0:
+                transition = random.choice(transition_valid_list)
+
+        if transition is None:
+            cur_time = time_now + delay
+            transition_invalid_list = []
+            for tran in transition_list:
+                if tran.target == tran.source and not tran.reset:
+                    for guard in tran.guards:
+                        if guard.is_in_interval(cur_time):
+                            transition_invalid_list.append(tran)
+                            break
+            if len(transition_invalid_list) > 0:
+                transition = random.choice(transition_invalid_list)
+
+        if transition is not None:
+            test.append(TimedWord(transition.action, delay))
+            if transition.reset:
+                time_now = 0
+            else:
+                time_now = time_now + delay
+            state_now = transition.target
+    return test
+
+
+# 随机测试算法4 - 改自随机测试算法2
+def random_testing_4(hypothesis, upper_guard, state_num, system):
+    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 5)
     pretry = 0.9
-    pstop = 0.02
+    pstop = 0.05
     pvalid = 0.8
+    pnext = 0.8
     max_steps = int(1.5 * state_num)
 
     ctx = None
     for i in range(test_num):
-        test = test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard)
+        test = test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard)
         test_list = prefixes(test)
         for j in test_list:
             flag = test_execution(hypothesis, system, j)
@@ -145,9 +198,9 @@ def random_testing_4(hypothesis, upper_guard, state_num, system):
 
 
 # 测试集生成方法
-def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard):
-    hypothesis = copy.deepcopy(hypothesis)
+def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard):
     test = []
+    hypothesis = copy.deepcopy(hypothesis)
     # 将迁移按照状态/有效性进行分组
     invalid_tran_dict = {}
     valid_tran_dict = {}
@@ -155,13 +208,13 @@ def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard)
         invalid_tran_dict[state] = []
         valid_tran_dict[state] = []
     for tran in hypothesis.trans:
-        if tran.source == tran.target and not tran.reset:
+        if tran.source == hypothesis.sink_state or tran.target == hypothesis.sink_state:
             invalid_tran_dict[tran.source].append(tran)
         else:
             valid_tran_dict[tran.source].append(tran)
     # 开始随机游走
-    state = hypothesis.init_state
     now_time = 0
+    state = hypothesis.init_state
     while True:
         if coin_flip(pvalid):
             if valid_tran_dict[state]:
@@ -197,186 +250,13 @@ def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard)
             break
         elif coin_flip(pstop):
             break
-
     # 是否多走几步，如果为sink_state则随机走几步
     if state == hypothesis.sink_state:
         linfix = math.ceil(len(hypothesis.states) / 2)
         li = random.randint(1, linfix)
         for i in range(li):
             test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
-    elif coin_flip(0.8):
-        target_state = random.choice(hypothesis.states)
-        while True:
-            path_dtw, now_time = find_path(hypothesis, upper_guard, now_time, state, target_state)
-            if path_dtw:
-                test.extend(path_dtw)
-                break
-            elif coin_flip(1 - pretry):
-                break
-    return test
-
-
-# 随机测试算法4 - 改自随机测试算法2
-def random_testing_4(hypothesis, upper_guard, state_num, system):
-    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 5)
-    pretry = 0.9
-    pstop = 0.02
-    pvalid = 0.8
-    max_steps = int(1.5 * state_num)
-
-    ctx = None
-    for i in range(test_num):
-        test = test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard)
-
-        test_list = prefixes(test)
-        for j in test_list:
-            flag = test_execution(hypothesis, system, j)
-            if flag:
-                ctx = test
-                return False, ctx
-    return True, ctx
-
-
-# 测试集生成方法
-def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard):
-    hypothesis = copy.deepcopy(hypothesis)
-    test = []
-    # 将迁移按照状态/有效性进行分组
-    invalid_tran_dict = {}
-    valid_tran_dict = {}
-    for state in hypothesis.states:
-        invalid_tran_dict[state] = []
-        valid_tran_dict[state] = []
-    for tran in hypothesis.trans:
-        if tran.source == tran.target and not tran.reset:
-            invalid_tran_dict[tran.source].append(tran)
-        else:
-            valid_tran_dict[tran.source].append(tran)
-    # 开始随机游走
-    state = hypothesis.init_state
-    now_time = 0
-    while True:
-        if coin_flip(pvalid):
-            if valid_tran_dict[state]:
-                next_tran = random.choice(valid_tran_dict[state])
-                delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
-                if delay_time is None:
-                    continue
-                test.append(TimedWord(next_tran.action, delay_time))
-                state = next_tran.target
-                if next_tran.reset:
-                    now_time = 0
-                else:
-                    now_time += delay_time
-            else:
-                continue
-        else:
-            if invalid_tran_dict[state]:
-                next_tran = random.choice(invalid_tran_dict[state])
-                delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
-                if delay_time is None:
-                    continue
-                test.append(TimedWord(next_tran.action, delay_time))
-                state = next_tran.target
-                if next_tran.reset:
-                    now_time = 0
-                else:
-                    now_time += delay_time
-            else:
-                continue
-        if len(test) > max_steps:
-            break
-        elif coin_flip(pstop):
-            break
-
-    # 是否多走几步
-    if coin_flip(0.8):
-        target_state = random.choice(hypothesis.states)
-        while True:
-            path_dtw, now_time = find_path(hypothesis, upper_guard, now_time, state, target_state)
-            if path_dtw:
-                test.extend(path_dtw)
-                break
-            elif coin_flip(1 - pretry):
-                break
-    return test
-
-
-# 随机测试算法4 - 改自随机测试算法2
-def random_testing_4(hypothesis, upper_guard, state_num, system):
-    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 5)
-    pretry = 0.9
-    pstop = 0.02
-    pvalid = 0.8
-    max_steps = int(1.5 * state_num)
-
-    ctx = None
-    for i in range(test_num):
-        test = test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard)
-
-        test_list = prefixes(test)
-        for j in test_list:
-            flag = test_execution(hypothesis, system, j)
-            if flag:
-                ctx = test
-                return False, ctx
-    return True, ctx
-
-
-# 测试集生成方法
-def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, upper_guard):
-    hypothesis = copy.deepcopy(hypothesis)
-    test = []
-    # 将迁移按照状态/有效性进行分组
-    invalid_tran_dict = {}
-    valid_tran_dict = {}
-    for state in hypothesis.states:
-        invalid_tran_dict[state] = []
-        valid_tran_dict[state] = []
-    for tran in hypothesis.trans:
-        if tran.source == tran.target and not tran.reset:
-            invalid_tran_dict[tran.source].append(tran)
-        else:
-            valid_tran_dict[tran.source].append(tran)
-    # 开始随机游走
-    state = hypothesis.init_state
-    now_time = 0
-    while True:
-        if coin_flip(pvalid):
-            if valid_tran_dict[state]:
-                next_tran = random.choice(valid_tran_dict[state])
-                delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
-                if delay_time is None:
-                    continue
-                test.append(TimedWord(next_tran.action, delay_time))
-                state = next_tran.target
-                if next_tran.reset:
-                    now_time = 0
-                else:
-                    now_time += delay_time
-            else:
-                continue
-        else:
-            if invalid_tran_dict[state]:
-                next_tran = random.choice(invalid_tran_dict[state])
-                delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
-                if delay_time is None:
-                    continue
-                test.append(TimedWord(next_tran.action, delay_time))
-                state = next_tran.target
-                if next_tran.reset:
-                    now_time = 0
-                else:
-                    now_time += delay_time
-            else:
-                continue
-        if len(test) > max_steps:
-            break
-        elif coin_flip(pstop):
-            break
-
-    # 是否多走几步
-    if coin_flip(0.8):
+    elif coin_flip(pnext):
         target_state = random.choice(hypothesis.states)
         while True:
             path_dtw, now_time = find_path(hypothesis, upper_guard, now_time, state, target_state)
@@ -397,35 +277,30 @@ def test_execution(hypothesis, system, sample):
 
 # --------------------------------- auxiliary function ---------------------------------
 
-def get_time_from_tran(tran, now_time, upper_guard):
-    valid_guards = []
-    for guard in tran.guards:
-        if guard.get_max() < now_time:
-            continue
-        elif guard.get_max() == now_time and not guard.get_closed_max():
-            continue
-        valid_guards.append(guard)
-    if not valid_guards:
-        return None
-    guard = random.choice(valid_guards)
-
-    cur_min = guard.get_min() if guard.closed_min else guard.get_min() + 0.5
-    if cur_min < now_time:
-        cur_min = now_time
-    if guard.get_max() == float("inf"):
-        return random.randint(0, upper_guard * 2) / 2
-    else:
-        cur_max = guard.get_max() if guard.get_closed_max() else guard.get_max() - 0.5
-        time = random.randint(cur_min * 2, cur_max * 2)
-        return time / 2 - now_time
-
-
 def coin_flip(p):
     return random.random() <= p
 
 
+def get_random_delay(upper_guard):
+    time = random.randint(0, upper_guard * 3 + 1)
+    if time % 2 == 0:
+        time = time // 2
+    else:
+        time = time // 2 + 0.5
+    return time
+
+
+# prefix set of tws （tws前缀集）
+def prefixes(tws):
+    new_prefixes = []
+    for i in range(1, len(tws) + 1):
+        temp_tws = tws[:i]
+        new_prefixes.append(temp_tws)
+    return new_prefixes
+
+
+# find a path from s1 to s2
 def find_path(hypothesis, upper_guard, now_time, s1, s2):
-    # find a path from s1 to s2
     init_now_time = now_time
     visited = []
     next_to_explore = queue.Queue()
@@ -457,19 +332,50 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
     return None, init_now_time
 
 
-def get_random_delay(upper_guard):
-    time = random.randint(0, upper_guard * 3 + 1)
-    if time % 2 == 0:
-        time = time // 2
+def get_transition_list(hypothesis, state_now):
+    transition_list = []
+    for tran in hypothesis.trans:
+        if tran.source == state_now:
+            transition_list.append(tran)
+    return transition_list
+
+
+def get_delay_list(transition_list):
+    delay_list = []
+    for transition in transition_list:
+        for guard in transition.guards:
+            left = guard.guard.split(',')[0]
+            right = guard.guard.split(',')[1]
+            if left[0] == '(':
+                delay_list.append(guard.get_min() + 0.5)
+            else:
+                delay_list.append(guard.get_min())
+            if right[-1] == ']':
+                delay_list.append(guard.get_max())
+            else:
+                if right[0] != '+':
+                    delay_list.append(guard.get_max() - 0.5)
+    return delay_list
+
+
+def get_time_from_tran(tran, now_time, upper_guard):
+    valid_guards = []
+    for guard in tran.guards:
+        if guard.get_max() < now_time:
+            continue
+        elif guard.get_max() == now_time and not guard.get_closed_max():
+            continue
+        valid_guards.append(guard)
+    if not valid_guards:
+        return None
+    guard = random.choice(valid_guards)
+
+    cur_min = guard.get_min() if guard.closed_min else guard.get_min() + 0.5
+    if cur_min < now_time:
+        cur_min = now_time
+    if guard.get_max() == float("inf"):
+        return random.randint(0, upper_guard * 2) / 2
     else:
-        time = time // 2 + 0.5
-    return time
-
-
-# prefix set of tws （tws前缀集）
-def prefixes(tws):
-    new_prefixes = []
-    for i in range(1, len(tws) + 1):
-        temp_tws = tws[:i]
-        new_prefixes.append(temp_tws)
-    return new_prefixes
+        cur_max = guard.get_max() if guard.get_closed_max() else guard.get_max() - 0.5
+        time = random.randint(cur_min * 2, cur_max * 2)
+        return time / 2 - now_time

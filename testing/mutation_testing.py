@@ -1,11 +1,10 @@
-import math
-import copy
 import random
+from copy import deepcopy
 from itertools import product
-from testing.random_testing import test_generation_2, test_generation_4
-from common.hypothesis import OTATran
 from common.TimedWord import TimedWord
+from common.hypothesis import OTATran
 from common.TimeInterval import Guard, guard_split
+from testing.random_testing import test_generation_4
 
 
 class NFA(object):
@@ -25,10 +24,10 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
 
     # 参数配置 - 测试生成
     pretry = 0.9
-    pstop = 0.02
+    pstop = 0.05
     pvalid = 0.8
+    pnext = 0.8
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
-    linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
 
     # 参数配置 - 变异相关
@@ -40,8 +39,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
     # 测试集生成
     tests = []
     for i in range(test_num):
-        # tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
-        tests.append(test_generation_4(hypothesisOTA, pretry, pstop, max_steps, pvalid, upper_guard))
+        tests.append(test_generation_4(hypothesisOTA, pretry, pstop, max_steps, pvalid, pnext, upper_guard))
 
     tested = []  # 缓存已测试序列
     # step1: timed变异
@@ -247,55 +245,9 @@ def split_state_operator(s1, s2, k, hypothesis):
     return mutants
 
 
-# transition mutation
-def mutation_tran(hypothesis, k, region_num, upper_guard, tests):
-    Tsel = []
-    # 生成变异体
-    mutations = tran_mutation_generation(hypothesis, k, region_num, upper_guard)
-    print('number of tran_mutations', len(mutations))
-    # 生成NFA
-    muts_NFA = NFA_generation(mutations, hypothesis)
-    print('number of tran NFA trans', len(muts_NFA.trans))
-    # 变异分析
-    print('Starting mutation analysis...')
-    tran_dict = get_tran_dict(muts_NFA)
-    tests_valid = []
-    C = []
-    C_tests = []
-    for test in tests:
-        C_test, C = mutation_analysis(muts_NFA, test, C, tran_dict)
-        if C_test:
-            tests_valid.append(test)
-            C_tests.append(C_test)
-    # 测试筛选
-    if C_tests:
-        Tsel = test_selection(tests_valid, C, C_tests)
-    return Tsel
-
-
-# tran mutation generation
-def tran_mutation_generation(hypothesis, k, region_num, upper_guard):
-    mutations = []
-    step_trans_dict = {}
-    for state in hypothesis.states:
-        step_trans_dict[state] = k_step_trans(hypothesis, state, k)
-    for tran in hypothesis.trans:
-        if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
-            continue
-        trans = split_tran_guard_remove_first(tran, region_num, upper_guard)
-        for state in hypothesis.states:
-            if state != tran.target:
-                for prefix in trans:
-                    temp = copy.deepcopy(prefix)
-                    temp.target = state
-                    for suffix in step_trans_dict[state]:
-                        mutations.append([temp] + suffix)
-    return mutations
-
-
 # generation NFA-based mutant representation
 def NFA_generation(mutations, hypothesis):
-    hypothesis = copy.deepcopy(hypothesis)
+    hypothesis = deepcopy(hypothesis)
     states = hypothesis.states
     init_state = hypothesis.init_state
     actions = hypothesis.actions
@@ -308,7 +260,7 @@ def NFA_generation(mutations, hypothesis):
         source_state = mutation[0].source
         target_state = None
         for tran in mutation:
-            tran = copy.deepcopy(tran)
+            tran = deepcopy(tran)
             target_state = str(mId) + '_' + str(count)
             tran.source = source_state
             tran.target = target_state
@@ -353,12 +305,58 @@ def mutation_analysis(muts_NFA, test, C, tran_dict):
     return C_test, C
 
 
+# transition mutation
+def mutation_tran(hypothesis, k, region_num, upper_guard, tests):
+    Tsel = []
+    # 生成变异体
+    mutations = tran_mutation_generation(hypothesis, k, region_num, upper_guard)
+    print('number of tran_mutations', len(mutations))
+    # 生成NFA
+    muts_NFA = NFA_generation(mutations, hypothesis)
+    print('number of tran NFA trans', len(muts_NFA.trans))
+    # 变异分析
+    print('Starting mutation analysis...')
+    tran_dict = get_tran_dict(muts_NFA)
+    tests_valid = []
+    C = []
+    C_tests = []
+    for test in tests:
+        C_test, C = mutation_analysis(muts_NFA, test, C, tran_dict)
+        if C_test:
+            tests_valid.append(test)
+            C_tests.append(C_test)
+    # 测试筛选
+    if C_tests:
+        Tsel = test_selection(tests_valid, C, C_tests)
+    return Tsel
+
+
+# tran mutation generation
+def tran_mutation_generation(hypothesis, k, region_num, upper_guard):
+    mutations = []
+    step_trans_dict = {}
+    for state in hypothesis.states:
+        step_trans_dict[state] = k_step_trans(hypothesis, state, k)
+    for tran in hypothesis.trans:
+        if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
+            continue
+        trans = split_tran_guard_remove_first(tran, region_num, upper_guard)
+        for state in hypothesis.states:
+            if state != tran.target:
+                for prefix in trans:
+                    temp = deepcopy(prefix)
+                    temp.target = state
+                    for suffix in step_trans_dict[state]:
+                        mutations.append([temp] + suffix)
+    return mutations
+
+
 # 测试筛选
 def test_selection(Tests, C, C_tests):
     Tsel = []
-    c = copy.deepcopy(C)  # all mutations
-    tests = copy.deepcopy(Tests)  # tests
-    cset = copy.deepcopy(C_tests)  # tests 对应的 cover mutation set
+    c = deepcopy(C)  # all mutations
+    tests = deepcopy(Tests)  # tests
+    cset = deepcopy(C_tests)  # tests 对应的 cover mutation set
     pre_set = []
     while c:
         cur_index = 0
@@ -424,7 +422,7 @@ def k_step_trans(hypothesis, q, k):
             if tran.source == cur_state:
                 if len(paths) > 0 and paths[-1] == tran:
                     continue
-                recursion(tran.target, copy.deepcopy(paths) + [tran])
+                recursion(tran.target, deepcopy(paths) + [tran])
 
     recursion(q, [])
     return trans_list
@@ -456,7 +454,7 @@ def get_all_acc(hypothesis, state, state_num):
             if tran.source == sn:
                 if len(path) > 0 and tran == path[-1]:
                     continue
-                get_next_tran(tran.target, copy.deepcopy(path) + [tran])
+                get_next_tran(tran.target, deepcopy(path) + [tran])
 
     get_next_tran(hypothesis.init_state, [])
     return paths

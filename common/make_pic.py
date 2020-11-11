@@ -4,6 +4,8 @@ from graphviz import Digraph
 # 目标系统OTA - accept
 def make_system(data, filePath, fileName):
     dot = Digraph()
+    dot.node(name='', label='', shape='plaintext')
+    dot.edge('', str(data.init_state), ' start', style='dashed')
     for state in data.states:
         if state in data.accept_states:
             dot.node(name=str(state), label=str(state), shape='doublecircle')
@@ -19,6 +21,8 @@ def make_system(data, filePath, fileName):
 # 猜想OTA - accept(忽略sink状态)
 def make_hypothesis(data, filePath, fileName):
     dot = Digraph()
+    dot.node(name='', label='', shape='plaintext')
+    dot.edge('', str(data.init_state), ' start', style='dashed')
     states = []
     for state in data.states:
         if state != data.sink_state:
@@ -39,6 +43,8 @@ def make_hypothesis(data, filePath, fileName):
 # 猜想OTA - accept + sink
 def make_full_hypothesis(data, filePath, fileName):
     dot = Digraph()
+    dot.node(name='', label='', shape='plaintext')
+    dot.edge('', str(data.init_state), ' start', style='dashed')
     states = data.states
     for s in states:
         if s in data.accept_states:

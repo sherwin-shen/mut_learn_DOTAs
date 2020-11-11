@@ -1,6 +1,6 @@
 import math
-from common.TimeInterval import Guard, simple_guards, guard_split
 from common.TimedWord import TimedWord, ResetTimedWord
+from common.TimeInterval import Guard, simple_guards
 
 
 class OTA(object):
@@ -62,6 +62,19 @@ class OTA(object):
             value = 0
         return DRTWs, value
 
+    # Get the max time value constant appearing in OTA.
+    def max_time_value(self):
+        max_time_value = 0
+        for tran in self.trans:
+            for c in tran.guards:
+                if c.max_value == '+':
+                    temp_max_value = float(c.min_value)
+                else:
+                    temp_max_value = float(c.max_value)
+                if max_time_value < temp_max_value:
+                    max_time_value = temp_max_value
+        return max_time_value + 1
+
     # build simple hypothesis - merge guards
     def build_simple_hypothesis(self):
         actions = self.actions
@@ -87,19 +100,6 @@ class OTA(object):
                             trans.append(OTATran(tran_num, s, action, guards, reset, t))
                             tran_num += 1
         return OTA(actions, states, trans, init_state, accept_states, sink_state)
-
-    # Get the max time value constant appearing in OTA.
-    def max_time_value(self):
-        max_time_value = 0
-        for tran in self.trans:
-            for c in tran.guards:
-                if c.max_value == '+':
-                    temp_max_value = float(c.min_value) + 1
-                else:
-                    temp_max_value = float(c.max_value)
-                if max_time_value < temp_max_value:
-                    max_time_value = temp_max_value
-        return max_time_value
 
 
 class DiscreteOTATran(object):

@@ -1,1 +1,1 @@
-# Learning DOTAs based on mutation-based testing
+# Learning DOTAs via mutation-based testing

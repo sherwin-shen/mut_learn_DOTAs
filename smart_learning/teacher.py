@@ -1,10 +1,9 @@
+import copy
+from common.TimedWord import TimedWord, LRTW_to_LTW, DRTW_to_LRTW
 from testing.random_testing import random_testing_1, random_testing_2, random_testing_3, random_testing_4
 from testing.mutation_testing import mutation_testing
-from common.TimedWord import TimedWord, LRTW_to_LTW, DRTW_to_LRTW
-import copy
 
 
-# LRTWs + value
 def TQs(LTWs, system):
     LRTWs, value = system.test_LTWs(LTWs)
     return LRTWs, value
@@ -23,11 +22,11 @@ def EQs(hypothesisOTA, system):
     # # 测试3 - 随机游走测试
     # equivalent, ctx = random_testing_3(hypothesisOTA, upper_guard, state_num, system)
 
-    # # 测试4 - 随机测试结合变异测试
-    # equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, system)
+    # # 测试4 - 改进的随机测试（用于结合mutation testing）
+    # equivalent, ctx = random_testing_4(hypothesisOTA, upper_guard, state_num, system)
 
-    # 测试5 - 改进的随机游走算法
-    equivalent, ctx = random_testing_4(hypothesisOTA, upper_guard, state_num, system)
+    # 测试5 - mutation-based-testing
+    equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, system)
 
     if ctx is not None:
         ctx = minimize_counterexample(hypothesisOTA, system, ctx)

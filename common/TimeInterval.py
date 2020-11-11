@@ -1,3 +1,4 @@
+from copy import deepcopy
 from enum import IntEnum
 
 
@@ -234,6 +235,39 @@ def sort_guards(guards):
             if guards[j].max_bn > guards[j + 1].max_bn:
                 guards[j], guards[j + 1] = guards[j + 1], guards[j]
     return guards
+
+
+# 补全区间
+def complement_intervals(guards):
+    partitions = []
+    key = []
+    floor_bn = BracketNum('0', Bracket.LC)
+    ceil_bn = BracketNum('+', Bracket.RO)
+    for guard in guards:
+        min_bn = guard.min_bn
+        max_bn = guard.max_bn
+        if min_bn not in key:
+            key.append(min_bn)
+        if max_bn not in key:
+            key.append(max_bn)
+    copyKey = deepcopy(key)
+    for bn in copyKey:
+        complement = bn.complement()
+        if complement not in copyKey:
+            copyKey.append(complement)
+    if floor_bn not in copyKey:
+        copyKey.insert(0, floor_bn)
+    if ceil_bn not in copyKey:
+        copyKey.append(ceil_bn)
+    copyKey.sort()
+    for index in range(len(copyKey)):
+        if index % 2 == 0:
+            tempGuard = Guard(copyKey[index].getBN() + ',' + copyKey[index + 1].getBN())
+            partitions.append(tempGuard)
+    for g in guards:
+        if g in partitions:
+            partitions.remove(g)
+    return partitions
 
 
 # guard按照minimal_duration进行切分，直到超过upper_guard

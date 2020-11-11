@@ -1,7 +1,7 @@
 from copy import deepcopy
+from common.system import build_canonicalOTA
 from common.equivalence import equivalence
 from testing.random_testing import test_generation_1
-from common.system import build_canonicalOTA
 
 
 def validate(learned_system, system):
@@ -9,7 +9,6 @@ def validate(learned_system, system):
     new_system = build_canonicalOTA(deepcopy(system))
     # 比较是否等价
     correct_flag, ctx = equivalence(learned_system, new_system, upper_guard)
-
     # 测试通过率
     if correct_flag:
         passingRate = 1
