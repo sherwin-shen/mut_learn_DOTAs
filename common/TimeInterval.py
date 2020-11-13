@@ -1,3 +1,4 @@
+from copy import deepcopy
 from enum import IntEnum
 
 
@@ -186,6 +187,16 @@ class Guard:
         else:
             return False
 
+    def get_region_num(self):
+        if self.max_value == '+':
+            return float('inf')
+        right = self.get_max()
+        closed_max = 0 if self.get_closed_max() else 1
+        left = self.get_min()
+        closed_min = 0 if self.get_closed_min() else 1
+        region_num = 2 * (right - left) + 1 - closed_max - closed_min
+        return region_num
+
     def show(self):
         return self.guard
 
@@ -224,3 +235,77 @@ def sort_guards(guards):
             if guards[j].max_bn > guards[j + 1].max_bn:
                 guards[j], guards[j + 1] = guards[j + 1], guards[j]
     return guards
+
+
+# 补全区间
+def complement_intervals(guards):
+    partitions = []
+    key = []
+    floor_bn = BracketNum('0', Bracket.LC)
+    ceil_bn = BracketNum('+', Bracket.RO)
+    for guard in guards:
+        min_bn = guard.min_bn
+        max_bn = guard.max_bn
+        if min_bn not in key:
+            key.append(min_bn)
+        if max_bn not in key:
+            key.append(max_bn)
+    copyKey = deepcopy(key)
+    for bn in copyKey:
+        complement = bn.complement()
+        if complement not in copyKey:
+            copyKey.append(complement)
+    if floor_bn not in copyKey:
+        copyKey.insert(0, floor_bn)
+    if ceil_bn not in copyKey:
+        copyKey.append(ceil_bn)
+    copyKey.sort()
+    for index in range(len(copyKey)):
+        if index % 2 == 0:
+            tempGuard = Guard(copyKey[index].getBN() + ',' + copyKey[index + 1].getBN())
+            partitions.append(tempGuard)
+    for g in guards:
+        if g in partitions:
+            partitions.remove(g)
+    return partitions
+
+
+# guard按照minimal_duration进行切分，直到超过upper_guard
+def guard_split(guard, step, upper_guard):
+    temp_guards = []
+    min_value = guard.get_min()
+    closed_min = '[' if guard.get_closed_min() else '('
+    max_value = guard.get_max()
+    closed_max = ']' if guard.get_closed_max() else ')'
+    if min_value >= upper_guard:
+        return [guard]
+    while min_value < upper_guard and min_value < max_value:
+        if closed_min == '(' and step % 2 != 0:
+            temp_max = min_value + (step + 1) / 2
+        elif closed_min == '(' and step % 2 == 0:
+            temp_max = min_value + step / 2
+        elif closed_min == '[' and step % 2 != 0:
+            temp_max = min_value + (step - 1) / 2
+        else:
+            temp_max = min_value + step / 2
+
+        if temp_max >= upper_guard or temp_max >= max_value:
+            break
+
+        if closed_min == '(' and step % 2 != 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
+            closed_min = '['
+        elif closed_min == '(' and step % 2 == 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
+            closed_min = '('
+        elif closed_min == '[' and step % 2 != 0:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
+            closed_min = '('
+        else:
+            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
+            closed_min = '['
+        min_value = temp_max
+    if max_value == float('inf'):
+        max_value = '+'
+    temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(max_value) + closed_max))
+    return temp_guards

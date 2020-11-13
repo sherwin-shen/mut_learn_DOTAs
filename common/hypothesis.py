@@ -1,21 +1,23 @@
 import math
-from common.TimeInterval import Guard, simple_guards
 from common.TimedWord import TimedWord, ResetTimedWord
+from common.TimeInterval import Guard, simple_guards
 
 
 class OTA(object):
-    def __init__(self, actions, states, trans, init_state, accept_states):
+    def __init__(self, actions, states, trans, init_state, accept_states, sink_state):
         self.actions = actions
         self.states = states
         self.trans = trans
         self.init_state = init_state
         self.accept_states = accept_states
+        self.sink_state = sink_state
 
     def show_discreteOTA(self):
         print("Actions: " + str(self.actions))
         print("States: " + str(self.states))
         print("InitState: {}".format(self.init_state))
         print("AcceptStates: {}".format(self.accept_states))
+        print("SinkState: {}".format(self.sink_state))
         print("Transitions: ")
         for t in self.trans:
             print(' ' + str(t.tran_id), 'S_' + str(t.source), str(t.action), str(t.time_point), str(t.reset), 'S_' + str(t.target), end="\n")
@@ -25,6 +27,7 @@ class OTA(object):
         print("States: " + str(self.states))
         print("InitState: {}".format(self.init_state))
         print("AcceptStates: {}".format(self.accept_states))
+        print("SinkState: {}".format(self.sink_state))
         print("Transitions: ")
         for t in self.trans:
             print("  " + str(t.tran_id), 'S_' + str(t.source), str(t.action), t.show_guards(), str(t.reset), 'S_' + str(t.target), end="\n")
@@ -35,24 +38,42 @@ class OTA(object):
         now_time = 0
         cur_state = self.init_state
         for dtw in DTWs:
-            time = dtw.time + now_time
-            new_LTW = TimedWord(dtw.action, time)
-            for tran in self.trans:
-                if tran.source == cur_state and tran.is_passing_tran(new_LTW):
-                    cur_state = tran.target
-                    if tran.reset:
-                        now_time = 0
-                        reset = True
-                    else:
-                        now_time = time
-                        reset = False
-                    DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
-                    break
+            if cur_state == self.sink_state:
+                DRTWs.append(ResetTimedWord(dtw.action, dtw.time, True))
+            else:
+                time = dtw.time + now_time
+                new_LTW = TimedWord(dtw.action, time)
+                for tran in self.trans:
+                    if tran.source == cur_state and tran.is_passing_tran(new_LTW):
+                        cur_state = tran.target
+                        if tran.reset:
+                            now_time = 0
+                            reset = True
+                        else:
+                            now_time = time
+                            reset = False
+                        DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
+                        break
         if cur_state in self.accept_states:
             value = 1
+        elif cur_state == self.sink_state:
+            value = -1
         else:
             value = 0
         return DRTWs, value
+
+    # Get the max time value constant appearing in OTA.
+    def max_time_value(self):
+        max_time_value = 0
+        for tran in self.trans:
+            for c in tran.guards:
+                if c.max_value == '+':
+                    temp_max_value = float(c.min_value)
+                else:
+                    temp_max_value = float(c.max_value)
+                if max_time_value < temp_max_value:
+                    max_time_value = temp_max_value
+        return max_time_value + 1
 
     # build simple hypothesis - merge guards
     def build_simple_hypothesis(self):
@@ -60,6 +81,7 @@ class OTA(object):
         states = self.states
         init_state = self.init_state
         accept_states = self.accept_states
+        sink_state = self.sink_state
         trans = []
         tran_num = 0
         for s in self.states:
@@ -77,20 +99,7 @@ class OTA(object):
                             guards = simple_guards(guards)
                             trans.append(OTATran(tran_num, s, action, guards, reset, t))
                             tran_num += 1
-        return OTA(actions, states, trans, init_state, accept_states)
-
-    # Get the max time value constant appearing in OTA.
-    def max_time_value(self):
-        max_time_value = 0
-        for tran in self.trans:
-            for c in tran.guards:
-                if c.max_value == '+':
-                    temp_max_value = float(c.min_value) + 1
-                else:
-                    temp_max_value = float(c.max_value)
-                if max_time_value < temp_max_value:
-                    max_time_value = temp_max_value
-        return max_time_value
+        return OTA(actions, states, trans, init_state, accept_states, sink_state)
 
 
 class DiscreteOTATran(object):
@@ -131,8 +140,9 @@ class OTATran(object):
 def struct_discreteOTA(table, actions):
     states = []
     trans = []
-    init_state = ''
+    init_state = None
     accept_states = []
+    sink_state = None
     # deal with states
     values_name_dict = {}
     for s, i in zip(table.S, range(0, len(table.S))):
@@ -143,6 +153,8 @@ def struct_discreteOTA(table, actions):
             init_state = state_name
         if s.values[0] == 1:
             accept_states.append(state_name)
+        if s.values[0] == -1:
+            sink_state = state_name
     # deal with trans
     trans_num = 0
     table_elements = [s for s in table.S] + [r for r in table.R]
@@ -176,7 +188,7 @@ def struct_discreteOTA(table, actions):
             temp_tran = DiscreteOTATran(trans_num, source, action, time_point, reset, target)
             trans.append(temp_tran)
             trans_num = trans_num + 1
-    return OTA(actions, states, trans, init_state, accept_states)
+    return OTA(actions, states, trans, init_state, accept_states, sink_state)
 
 
 def struct_hypothesisOTA(discreteOTA):
@@ -219,31 +231,9 @@ def struct_hypothesisOTA(discreteOTA):
                     guards.append(tempGuard)
                 for guard in guards:
                     trans.append(OTATran(tran.tran_id, tran.source, tran.action, [guard], tran.reset, tran.target))
-    return OTA(discreteOTA.actions, discreteOTA.states, trans, discreteOTA.init_state, discreteOTA.accept_states)
+    return OTA(discreteOTA.actions, discreteOTA.states, trans, discreteOTA.init_state, discreteOTA.accept_states, discreteOTA.sink_state).build_simple_hypothesis()
 
-def struct_simpleHypothesis(hypothesis):
-    actions = hypothesis.actions
-    states = hypothesis.states
-    init_state = hypothesis.init_state
-    accept_states = hypothesis.accept_states
-    trans = []
-    tranNum = 0
-    for s in hypothesis.states:
-        for t in hypothesis.states:
-            for action in actions:
-                for reset in [True, False]:
-                    temp = []
-                    for tran in hypothesis.trans:
-                        if tran.source == s and tran.action == action and tran.target == t and tran.reset == reset:
-                            temp.append(tran)
-                    if temp:
-                        guards = []
-                        for i in temp:
-                            guards += i.guards
-                        guards = simple_guards(guards)
-                        trans.append(OTATran(tranNum, s, action, guards, reset, t))
-                        tranNum += 1
-    return OTA(actions, states, trans, init_state, accept_states)
+
 # --------------------------------- auxiliary function ---------------------------------
 
 # Determine whether two LRTWs are the same

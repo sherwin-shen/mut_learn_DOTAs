@@ -1,6 +1,6 @@
-import copy
 from common.TimedWord import TimedWord, ResetTimedWord
-from common.TimeInterval import Guard, BracketNum, Bracket
+from common.TimeInterval import Guard, BracketNum, Bracket, complement_intervals
+from common.hypothesis import OTA, OTATran
 
 
 class System(object):
@@ -14,11 +14,19 @@ class System(object):
         self.mq_num = 0
         self.eq_num = 0
         self.test_num = 0
+        self.test_num_cache = 0
+        self.cache = {}
 
     # Perform tests(DTWs) on the system, return value and DRTWs(full)
     def test_DTWs(self, DTWs):
         self.test_num += 1
+        tuple_DTWs = tuple(DTWs)
+        if tuple_DTWs in self.cache:
+            return self.cache[tuple_DTWs][0], self.cache[tuple_DTWs][1]
+        self.test_num_cache += 1
+
         DRTWs = []
+        value = None
         now_time = 0
         cur_state = self.init_state
         for dtw in DTWs:
@@ -38,14 +46,21 @@ class System(object):
                     DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
                     break
             if not flag:
-                cur_state = cur_state
-                now_time = time
-                reset = False
-                DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
-        if cur_state in self.accept_states:
-            value = 1
-        else:
-            value = 0
+                DRTWs.append(ResetTimedWord(dtw.action, dtw.time, True))
+                value = -1
+                break
+        # 补全
+        len_diff = len(DTWs) - len(DRTWs)
+        if len_diff != 0:
+            temp = DTWs[len(DRTWs):]
+            for i in temp:
+                DRTWs.append(ResetTimedWord(i.action, i.time, True))
+        if value != -1:
+            if cur_state in self.accept_states:
+                value = 1
+            else:
+                value = 0
+        self.cache[tuple_DTWs] = [DRTWs, value]
         return DRTWs, value
 
     # Perform tests(LTWs) on the system(smart teacher), return value and LRTWs
@@ -57,29 +72,39 @@ class System(object):
             else:
                 value = 0
             return [], value
-        else:
-            LRTWs = []
-            value = None
-            now_time = 0
-            cur_state = self.init_state
-            for ltw in LTWs:
-                if ltw.time < now_time:
-                    LRTWs.append(ResetTimedWord(ltw.action, ltw.time, False))
-                    continue
+        LRTWs = []
+        value = None
+        now_time = 0
+        cur_state = self.init_state
+        for ltw in LTWs:
+            if ltw.time < now_time:
+                value = -1
+                LRTWs.append(ResetTimedWord(ltw.action, ltw.time, True))
+                break
+            else:
+                DTW = TimedWord(ltw.action, ltw.time - now_time)
+                cur_state, value, reset = self.test_DTW(DTW, now_time, cur_state)
+                if reset:
+                    LRTWs.append(ResetTimedWord(ltw.action, ltw.time, True))
+                    now_time = 0
                 else:
-                    DTW = TimedWord(ltw.action, ltw.time - now_time)
-                    cur_state, value, reset = self.test_DTW(DTW, now_time, cur_state)
-                    if reset:
-                        LRTWs.append(ResetTimedWord(ltw.action, ltw.time, True))
-                        now_time = 0
-                    else:
-                        LRTWs.append(ResetTimedWord(ltw.action, ltw.time, False))
-                        now_time = ltw.time
-            return LRTWs, value
+                    LRTWs.append(ResetTimedWord(ltw.action, ltw.time, False))
+                    now_time = ltw.time
+                if value == -1:
+                    break
+        # 补全
+        len_diff = len(LTWs) - len(LRTWs)
+        if len_diff != 0:
+            temp = LTWs[len(LRTWs):]
+            for i in temp:
+                LRTWs.append(ResetTimedWord(i.action, i.time, True))
+        return LRTWs, value
 
     # input -> DTW(single)，output -> curState and value - for logical-timed test
     def test_DTW(self, DTW, now_time, cur_state):
+        value = None
         reset = False
+        tran_flag = False  # tranFlag为true表示有这样的迁移
         if DTW is None:
             if cur_state in self.accept_states:
                 value = 1
@@ -87,22 +112,21 @@ class System(object):
                 value = 0
         else:
             LTW = TimedWord(DTW.action, DTW.time + now_time)
-            tran_flag = False  # tranFlag为true表示有这样的迁移
             for tran in self.trans:
                 if tran.source == cur_state and tran.is_passing_tran(LTW):
                     tran_flag = True
                     cur_state = tran.target
-                    if tran.reset:
-                        reset = True
+                    reset = True if tran.reset else False
                     break
             if not tran_flag:
-                cur_state = cur_state
-                reset = False
+                value = -1
+                cur_state = 'sink'
+                reset = True
             if cur_state in self.accept_states:
                 value = 1
-            else:
+            elif cur_state != 'sink':
                 value = 0
-        return cur_state, value, reset
+            return cur_state, value, reset
 
     # Get the max time value constant appearing in OTA.
     def max_time_value(self):
@@ -110,12 +134,23 @@ class System(object):
         for tran in self.trans:
             for c in tran.guards:
                 if c.max_value == '+':
-                    temp_max_value = float(c.min_value) + 1
+                    temp_max_value = float(c.min_value)
                 else:
                     temp_max_value = float(c.max_value)
                 if max_time_value < temp_max_value:
                     max_time_value = temp_max_value
-        return max_time_value
+        return max_time_value + 1
+
+    # Get the minimal duration of a (finite) time guard
+    def get_minimal_duration(self):
+        res = float('inf')
+        for tran in self.trans:
+            for guard in tran.guards:
+                if guard.get_region_num() < res:
+                    res = guard.get_region_num()
+        if res == float('inf'):
+            res = 1
+        return res
 
 
 class SysTran(object):
@@ -175,7 +210,9 @@ def build_canonicalOTA(system):
     init_state = system.init_state
     accept_states = system.accept_states
 
+    sinkFlag = False
     newTrans = []
+    sink_state = 'sink'
     tranNumber = len(system.trans)
 
     for state in system.states:
@@ -194,44 +231,20 @@ def build_canonicalOTA(system):
             else:
                 addGuards = [Guard('[0,+)')]
             if len(addGuards) > 0:
+                sink_state = 'sink'
+                sinkFlag = True
                 for guard in addGuards:
-                    tempTran = SysTran(tranNumber, state, key, [guard], False, state)
+                    tempTran = OTATran(tranNumber, state, key, [guard], True, sink_state)
                     tranNumber = tranNumber + 1
                     newTrans.append(tempTran)
-    newOTA = System(actions, states, trans+newTrans, init_state, accept_states)
+    if sinkFlag:
+        states.append(sink_state)
+        for tran in newTrans:
+            trans.append(tran)
+        for action in actions:
+            guards = [Guard('[0,+)')]
+            tempTran = OTATran(tranNumber, sink_state, action, guards, True, sink_state)
+            tranNumber = tranNumber + 1
+            trans.append(tempTran)
+    newOTA = OTA(actions, states, trans, init_state, accept_states, sink_state)
     return newOTA
-
-
-# --------------------------------- auxiliary function ---------------------------------
-
-# 补全区间
-def complement_intervals(guards):
-    partitions = []
-    key = []
-    floor_bn = BracketNum('0', Bracket.LC)
-    ceil_bn = BracketNum('+', Bracket.RO)
-    for guard in guards:
-        min_bn = guard.min_bn
-        max_bn = guard.max_bn
-        if min_bn not in key:
-            key.append(min_bn)
-        if max_bn not in key:
-            key.append(max_bn)
-    copyKey = copy.deepcopy(key)
-    for bn in copyKey:
-        complement = bn.complement()
-        if complement not in copyKey:
-            copyKey.append(complement)
-    if floor_bn not in copyKey:
-        copyKey.insert(0, floor_bn)
-    if ceil_bn not in copyKey:
-        copyKey.append(ceil_bn)
-    copyKey.sort()
-    for index in range(len(copyKey)):
-        if index % 2 == 0:
-            tempGuard = Guard(copyKey[index].getBN() + ',' + copyKey[index + 1].getBN())
-            partitions.append(tempGuard)
-    for g in guards:
-        if g in partitions:
-            partitions.remove(g)
-    return partitions

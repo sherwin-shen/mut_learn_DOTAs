@@ -4,7 +4,9 @@ from common.hypothesis import struct_discreteOTA, struct_hypothesisOTA
 from smart_learning.teacher import EQs
 
 
-def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
+def learnOTA_smart(system, debug_flag):
+    actions = system.actions
+
     ### init Table
     table = obsTable.initTable(actions, system)
     if debug_flag:
@@ -15,7 +17,6 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
     equivalent = False
     learned_system = None  # learned model
     table_num = 1  # number of table
-    hy_num = 1
 
     while not equivalent:
         ### make table prepared
@@ -36,8 +37,6 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
                 consistent_flag, consistent_add = table.is_consistent()
                 table = obsTable.make_consistent(table, consistent_add, system)
                 table_num = table_num + 1
-                if table_num == 23:
-                    print('attention!')
                 if debug_flag:
                     print("***************** consistent-Table_" + str(table_num) + " is as follow *******************")
                     table.show()
@@ -58,15 +57,15 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
             hypothesisOTA.show_OTA()
 
         ### EQs
-
-        equivalent, ctx = EQs(hypothesisOTA, upper_guard, state_num, system, hy_num)
-        hy_num += 1
+        equivalent, ctx = EQs(hypothesisOTA, system)
 
         if not equivalent:
             # show ctx
             if debug_flag:
                 print("***************** counterexample is as follow. *******************")
                 print([dtw.show() for dtw in ctx])
+            print("***************** counterexample is as follow. *******************")
+            print([dtw.show() for dtw in ctx])
             # deal with ctx
             table = obsTable.deal_ctx(table, ctx, system)
             table_num = table_num + 1
@@ -74,9 +73,6 @@ def learnOTA_smart(system, actions, upper_guard, state_num, debug_flag):
                 print("***************** New-Table" + str(table_num) + " is as follow *******************")
                 table.show()
         else:
-            learned_system = copy.deepcopy(hypothesisOTA).build_simple_hypothesis()
-            for e in table.E:
-                if len(e) > 1:
-                    raise Exception("E len > 1")
+            learned_system = copy.deepcopy(hypothesisOTA)
 
-    return learned_system, system.mq_num, system.eq_num, system.test_num, table_num
+    return learned_system, system.mq_num, system.eq_num, system.test_num, system.test_num_cache, table_num

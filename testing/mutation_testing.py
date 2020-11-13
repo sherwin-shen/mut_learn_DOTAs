@@ -1,352 +1,227 @@
 import random
-import queue
-import copy
+from copy import deepcopy
+from itertools import product
 from common.TimedWord import TimedWord
-from common.TimeInterval import Guard
 from common.hypothesis import OTATran
-from testing.random_testing import test_generation_2
+from common.TimeInterval import Guard, guard_split
+from testing.random_testing import test_generation_4
 
 
-# --------------------------------- 算法1 - mutation testing用于测试集筛选 ---------------------------------
-
-def mutation_testing_1(hypothesisOTA, upper_guard, state_num, system):
-    # 生成候选测试集
-    test_num = len(hypothesisOTA.states)*len(hypothesisOTA.states)*upper_guard*10
-    tests = []
-    pretry = 0.9
-    pstop = 0.02
-    linfix = int(len(hypothesisOTA.states) / 2)+1
-    max_steps = int(1.5 * state_num)
-    for i in range(test_num):
-        tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
-    print("lenth of tests:", len(tests))
-
-    #状态数为1 特殊处理：
-    #if len(hypothesisOTA.states) == 1:
-    #    equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests, upper_guard)
-    #    return equivalent, ctx
-
-
-    # 生成变异体及变异分析
-    Tsel = []
-    cMuts = []
-    IMutsel = []
-    nacc = 10
-    nsel = 100
-    mutations = mutant_generation_split(hypothesisOTA, nacc)
-    print("lenth of mutations:", len(mutations))
-    if len(mutations) > 0:
-        #IMutsample = mutant_sample(hypothesisOTA.states, mutations)
-        IMutsample = mutations
-        NMut = NFA_mutant(hypothesisOTA, IMutsample)
-        pre_tests = []
-        for t0 in tests:
-            cMut, IMutsel = mutation_analysis(t0, NMut, IMutsel)
-            if cMut:
-                pre_tests.append(t0)
-                cMuts.append(cMut)
-
-        print("lenth of cMuts:", len(cMuts))
-        print("lenth of IMutsel:", len(IMutsel))
-        print("lenth of pre_tests:", len(pre_tests))
-    if cMuts:
-        Tsel = test_selection(pre_tests, IMutsel, cMuts, 2000)  # 选择尽可能少的测试集覆盖cMuts里所包含的muts
-        print("lenth of Tsel:", len(Tsel))
-
-        for test in Tsel:
-            for i in range(len(test)-1):
-                if test[0 : i+1] not in Tsel:
-                    Tsel.append(test[0 : i+1])
-
-        equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
-        print("lenth of Tsel:", len(Tsel))
-    else:
-        #raise Exception("Mutation Failed!")
-        print("Mutation Failed!")
-        equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests, upper_guard)
-
-    # 测试执行
-    if equivalent:
-        equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests, upper_guard)
-
-    #else:
-        #raise Exception("Mutation Failed!")
-    return equivalent, ctx
-
-def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
-    # 生成候选测试集
-    test_num = len(hypothesisOTA.states)*len(hypothesisOTA.states)*upper_guard*10
-    tests = []
-    pretry = 0.9
-    pstop = 0.02
-    linfix = int(len(hypothesisOTA.states) / 2)+1
-    max_steps = int(1.5 * state_num)
-    for i in range(test_num):
-        tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
-    print("lenth of tests:", len(tests))
-
-    #状态数为1 特殊处理：
-    #if len(hypothesisOTA.states) == 1:
-    #    equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests)
-    #    return equivalent, ctx
-
-
-    # 生成变异体及变异分析
-
-    equivalent, ctx = mutant_generation_guard(hypothesisOTA, system, tests, upper_guard)
-
-    #else:
-        #raise Exception("Mutation Failed!")
-    return equivalent, ctx
-
-
-class Mut(object):
-    def __init__(self, hypothesis, location_pre, action_pre, v_actions, mId):
-        self.h = hypothesis
-        self.location_pre = location_pre
-        self.action_pre = action_pre
-        self.v_actions = v_actions
-        self.mId = mId
-
-    def showMut(self):
-        print("mId: " + str(self.mId))
-        print("location_pre: " + str(self.location_pre))
-        print("action_pre: " + str(self.action_pre))
-        print("v_actions: " + str(self.v_actions))
-
-
-class NFAMut(object):
-    def __init__(self, states, s_state, inputs, trans, f_states):
+class NFA(object):
+    def __init__(self, states, init_state, actions, trans, sink_state, final_states):
         self.states = states
-        self.s_state = s_state
-        self.inputs = inputs
+        self.init_state = init_state
+        self.actions = actions
         self.trans = trans
-        self.f_states = f_states
-
-'''
-class CoverATree_Node(object):
-    def __init__(self,state,nodetime):
-        self.state = state
-        self.nodeTime = nodetime
-        self.nextstates = []
-
-    def addNextStates(self,states):
-        self.nextstates.append(states)
-'''
+        self.sink_state = sink_state
+        self.final_states = final_states
 
 
-def mutant_generation_guard(hypothesis, system, Tests, upper_guard):
-    cMuts = []
-    IMutsel = []
-    #mId=0
-    #next_trans = list(len(hypothesis.states))
-    #next_trans = {}
-    #pre_trans = list(len(hypothesis.states))
-    #for state in hypothesis.states:
-    #    next_trans[state] = []
+# 基于变异的测试主函数
+def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
+    equivalent = True
+    ctx = None
 
-    #for tran in hypothesis.trans:
-    #    next_trans[tran.source].append(tran)
-        #pre_trans[int(tran.target)].append(tran)
-    tran_id = 0
-    #new_trans = get_guardshift_trans(hypothesis, "complement", upper_guard)
-    new_trans = get_guardshift_trans(hypothesis, "widen", upper_guard)
-    NFA_mut_guard = NFAMut(hypothesis.states, hypothesis.init_state, hypothesis.actions, hypothesis.trans + new_trans, [])
+    # 参数配置 - 测试生成
+    pretry = 0.9
+    pstop = 0.05
+    pvalid = 0.8
+    pnext = 0.8
+    max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
+    test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
 
-    print("lenth of guard new_trans:", len(new_trans))
+    # 参数配置 - 变异相关
+    region_num = system.get_minimal_duration()  # It can also be set by the user.
+    nacc = 8
+    k = 1
+    nsel = 200
 
-    pre_tests = []
-    Tsel = []
+    # 测试集生成
+    tests = []
+    for i in range(test_num):
+        tests.append(test_generation_4(hypothesisOTA, pretry, pstop, max_steps, pvalid, pnext, upper_guard))
 
-    NFA_mut_guard_tran_dict = {}
-    for s in NFA_mut_guard.states:
-        NFA_mut_guard_tran_dict[s] = []
-    for t in NFA_mut_guard.trans:
-        NFA_mut_guard_tran_dict[t.source].append(t)
+    tested = []  # 缓存已测试序列
 
-    for test in Tests:
-        cMut, IMutsel = mutation_analysis_guard(test, NFA_mut_guard, IMutsel, NFA_mut_guard_tran_dict)
-        if cMut:
-            pre_tests.append(test)
-            cMuts.append(cMut)
-    if cMuts:
-        Tsel = test_selection(pre_tests, IMutsel, cMuts, 2000)  # 选择尽可能少的测试集覆盖cMuts里所包含的muts
+    # mutation_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
+    # mutation_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
+    mutation_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
+    if len(mutation_tests) > 0:
+        print('number of timed tests', len(mutation_tests))
+        equivalent, ctx = test_execution(hypothesisOTA, system, mutation_tests)
+        tested = mutation_tests
+        # step4: 随机选取测试集直到数量满足nsel
+    if equivalent and len(mutation_tests) < nsel:
+        tests = remove_tested(tests, tested)
+        if nsel - len(mutation_tests) > len(tests):
+            random_tests = tests
+        else:
+            random_tests = random.sample(tests, nsel - len(mutation_tests))
+        print('number of random tests', len(random_tests))
+        equivalent, ctx = test_execution(hypothesisOTA, system, random_tests)
 
-    print("lenth of guard cMuts:", len(cMuts))
-    print("lenth of guard IMutsel:", len(IMutsel))
-    print("lenth of guard pre_tests:", len(pre_tests))
-    if Tsel :
-        for test in Tsel:
-            for i in range(len(test) - 1):
-                if test[0: i + 1] not in Tsel:
-                    Tsel.append(test[0: i + 1])
+    #######################################################
+    '''
+    # step1: timed变异
+    timed_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
+    if len(timed_tests) > 0:
+        print('number of timed tests', len(timed_tests))
+        equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
+        tested = timed_tests
 
-        #equivalent, ctx = test_execution(hypothesisOTA, system, Tsel)
-        equivalent, ctx = test_execution(hypothesis, system, Tsel)
-        print("lenth of guard Tsel:", len(Tsel))
+    # step2: 如果未找到反例, transition变异
+    if equivalent:
+        tran_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
+        if len(tran_tests) > 0:
+            tran_tests = remove_tested(tran_tests, tested)
+            print('number of tran tests', len(tran_tests))
+            equivalent, ctx = test_execution(hypothesisOTA, system, tran_tests)
+            tested += tran_tests
+
+        # step3: 如果未找到反例, state变异
+        if equivalent:
+            state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
+            if len(state_tests) > 0:
+                state_tests = remove_tested(state_tests, tested)
+                print('number of state tests', len(state_tests))
+                equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
+                tested += state_tests
+
+            # step4: 随机选取测试集直到数量满足nsel
+            if equivalent and len(timed_tests) + len(state_tests) + len(tran_tests) < nsel:
+                tests = remove_tested(tests, tested)
+                if nsel - len(timed_tests) - len(state_tests) - len(tran_tests) > len(tests):
+                    random_tests = tests
+                else:
+                    random_tests = random.sample(tests, nsel - len(timed_tests) - len(state_tests) - len(tran_tests))
+                print('number of random tests', len(random_tests))
+                equivalent, ctx = test_execution(hypothesisOTA, system, random_tests)
+    '''
+    ###########################################################################################################
 
     return equivalent, ctx
 
-def mutation_analysis_guard1(test, NMut, IMutsel, max_num):
-    s0 = NMut.s_state
-    Trans = NMut.trans
-    #F_states = NMut.f_states
-    cMut = []
-    j = 0
-    nowTime = 0
 
-    def tree_create(state, preTime, test_index):
-        if test_index >= len(test):
-            return
-        time = test[test_index].time + preTime
-        newTest = TimedWord(test[test_index].action, time)
-
-
-
-        for tran in Trans:
-            if tran.source == state and tran.is_passing_tran(newTest):
-                if tran.reset:
-                    tempTime = 0
-                else:
-                    tempTime = time
-                if tran and isinstance(tran.tran_id, str):
-                    if tran.tran_id not in cMut:
-                        cMut.append(tran.tran_id)
-                    if tran.tran_id not in IMutsel:
-                        IMutsel.append(tran.tran_id)
-                #if tran.tran_id[0:3] == "new":
-                tree_create(tran.target, tempTime, test_index + 1)
-    tree_create(s0, nowTime, j)
-    return cMut, IMutsel
-
-# guard变异分析 - 获得test覆盖到的mut
-def mutation_analysis_guard(test, NMut, IMutsel, NFA_mut_guard_tran_dict):
-    cMut = []
-    catch={}
-    for i in range(len(test)):
-        catch[i]=[]
+# timed mutation
+def mutation_timed(hypothesis, region_num, upper_guard, k, tests):
+    Tsel = []
+    # 生成变异体
+    mutations = timed_mutation_generation(hypothesis, region_num, upper_guard, k)
+    print('number of timed_mutations', len(mutations))
+    # 生成NFA
+    muts_NFA = NFA_generation(mutations, hypothesis)
+    print('number of timed NFA trans', len(muts_NFA.trans))
+    # 变异分析
+    print('Starting mutation analysis...')
+    tran_dict = get_tran_dict(muts_NFA)
+    tests_valid = []
+    C = []
+    C_tests = []
+    for test in tests:
+        C_test, C = mutation_analysis(muts_NFA, test, C, tran_dict)
+        if C_test:
+            tests_valid.append(test)
+            C_tests.append(C_test)
+    # 测试筛选
+    if C_tests:
+        Tsel = test_selection(tests_valid, C, C_tests)
+    return Tsel
 
 
-    def tree_create(state, preTime, test_index):
-        if test_index >= len(test):
-            return True
-        cur_time = test[test_index].time + preTime
-        new_LTW = TimedWord(test[test_index].action, cur_time)
-        cur_trans = NFA_mut_guard_tran_dict[state]
-        for tran in cur_trans:
-            if tran.is_passing_tran(new_LTW):
-                if tran.reset:
-                    tempTime = 0
-                else:
-                    tempTime = cur_time
-                if isinstance(tran.tran_id, str):
-                    if tran.tran_id not in cMut:
-                        cMut.append(tran.tran_id)
-                    if tran.tran_id not in IMutsel:
-                        IMutsel.append(tran.tran_id)
-                #if [tran.target, tempTime] not in catch:
-                #    catch.append([tran.target, tempTime])
-                #    tree_create(tran.target, tempTime, test_index + 1, catch)
-
-                if [tran.target, tempTime] not in catch[test_index]:
-                    #temp_catch = copy.deepcopy(cache)
-                    tree_create(tran.target, tempTime, test_index + 1)
-                    catch[test_index].append([tran.target, tempTime])
-                    #temp_catch.append([tran.target, tempTime])
-                    #cache = temp_catch
-    tree_create(NMut.s_state, 0, 0)
-    return cMut, IMutsel
-
-def get_guardshift_trans1(hypothesis, tran_id, next_trans, upper_guard):
+# timed mutation generation/operator
+def timed_mutation_generation(hypothesis, region_num, upper_guard, k):
+    mutations = []
     new_trans = []
-    mut_times =2
-    for q in hypothesis.states:
-        for tran in next_trans[q]:
-                    new_guards = []
-                    temp_gurds = []
-                    for guard in tran.guards:
-                        max = guard.get_max()
-                        min = guard.get_min()
-                        #temp_gurds.append(max)
-                        #temp_gurds.append(min)
-                        #shift = random.randint()
-                        temp_gurds.append(max)
-                        temp_gurds.append(min)
-                        #if guard.get_closed_max():
-                        #    temp_gurds.append(int(max))
-                        #else:
-                        #    temp_gurds.append(max - 0.1)
-                        #if guard.get_closed_min():
-                        #    temp_gurds.append(int(min))
-                        #else:
-                        #    temp_gurds.append(min + 0.1)
-                    temp_gurds.sort()
-                    temp_value = copy.deepcopy(temp_gurds)
-
-                    for i in range(mut_times):
-                        index1 = 0
-                        while index1 < len(temp_value):
-                            if index1 == 0 and int(temp_gurds[index1]) == 0:
-                                #index1 += 1
-                                if index1 + 1 == len(temp_gurds)-1 and temp_gurds[index1 + 1] == float("inf"):
-                                    if coin_flip(0.5):
-                                        temp_value[0] = random.randint(0, upper_guard)
-                                    else:
-                                        temp_value[1] = random.randint(1, upper_guard)
-                                    break
-                                elif index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] != float("inf"):
-                                    temp_value[index1+1] = random.randint(1, upper_guard)
-                                    break
-                                else:
-                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 2])
-                                    index1 += 2
-                                continue
-                            elif index1 == 0 and int(temp_gurds[index1]) != 0:
-                                if index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] == float("inf"):
-                                    temp_value[index1] = random.randint(0, temp_gurds[index1] + upper_guard)
-                                    break
-                                elif index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] != float("inf"):
-                                    temp_value[index1] = random.randint(0, temp_gurds[index1 + 1])
-                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 1] + upper_guard)
-                                    break
-                                else:
-                                    temp_value[index1] = random.randint(0, temp_gurds[index1 + 1])
-                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 2])
-                                    index1 += 2
-                                    continue
-                            else:
-                                if index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] == float("inf"):
-                                    temp_value[index1] = random.randint(temp_gurds[index1 - 1], temp_gurds[index1] + upper_guard)
-                                    break
-                                elif index1 + 1 == len(temp_gurds) - 1 and temp_gurds[index1 + 1] != float("inf"):
-                                    temp_value[index1] = random.randint(temp_gurds[index1 - 1], temp_gurds[index1 + 1])
-                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 1] + upper_guard)
-                                    break
-                                else:
-                                    temp_value[index1] = random.randint(temp_gurds[index1 - 1], temp_gurds[index1 + 1])
-                                    temp_value[index1 + 1] = random.randint(temp_gurds[index1], temp_gurds[index1 + 2])
-                                    index1 += 2
-                                    continue
-                        index2 = 0
-                        while index2 < len(temp_value) :
-                            if temp_value[index2 + 1] == float("inf"):
-                                new_guard = "[" + str(temp_value[index2]) + ",+)"
-                            else:
-                                new_guard = "[" + str(temp_value[index2]) + "," + str(temp_value[index2 + 1]) + ")"
-                            new_guards.append(Guard(new_guard))
-                            index2 += 2
-                        new_trans.append(OTATran("new"+str(tran_id), tran.source, tran.action, new_guards, tran.reset, tran.target))
-                        tran_id += 1
-    return new_trans
+    for tran in hypothesis.trans:
+        if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
+            continue
+        for guard in tran.guards:
+            guard_min = guard.get_min()
+            guard_max = guard.get_max()
+            # 特殊情况处理 - [0,+)
+            if guard_min == 0 and guard.get_closed_min() and guard_max == float("inf"):
+                temp_guards = guard_split(guard, region_num, upper_guard)
+                for state in hypothesis.states:
+                    for temp_guard in temp_guards:
+                        if state == tran.target:
+                            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, state))
+                        else:
+                            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, state))
+                            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, state))
+                continue
+            # 正常情况处理 - 处理左边
+            if guard_min == 0:
+                if not guard.get_closed_min():
+                    new_trans.append(OTATran('', tran.source, tran.action, [Guard("[0,0]")], tran.reset, tran.target))
+                    new_trans.append(
+                        OTATran('', tran.source, tran.action, [Guard("[0,0]")], not tran.reset, tran.target))
+            else:
+                if guard.get_closed_min():
+                    left_guard = Guard('[0,' + str(guard_min) + ')')
+                else:
+                    left_guard = Guard('[0,' + str(guard_min) + ']')
+                temp_guards = guard_split(left_guard, region_num, upper_guard)
+                for temp_guard in temp_guards:
+                    new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, tran.target))
+                    new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, tran.target))
+            # 正常情况处理 - 处理右边
+            if guard_max == float("inf") or guard_max >= upper_guard:
+                pass
+            else:
+                if guard.get_closed_max():
+                    left_guard = Guard('(' + str(guard_max) + ',+)')
+                else:
+                    left_guard = Guard('[' + str(guard_max) + ',+)')
+                temp_guards = guard_split(left_guard, region_num, upper_guard)
+                for temp_guard in temp_guards:
+                    new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, tran.target))
+                    new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, tran.target))
+            # 正常情况处理 - 处理自身
+            temp_guards = guard_split(guard, region_num, upper_guard)
+            for temp_guard in temp_guards:
+                new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, tran.target))
+    # 每个迁移都往后走k步
+    for new_tran in new_trans:
+        suffixes = k_step_trans(hypothesis, new_tran.target, k)
+        for suffix in suffixes:
+            mutations.append([new_tran] + suffix)
+    return mutations
 
 
+# split_state mutation
+def mutation_state(hypothesis, state_num, nacc, k, region_num, upper_guard, tests):
+    Tsel = []
+    # 生成变异体
+    mutations = split_state_mutation_generation(hypothesis, nacc, k, state_num, region_num, upper_guard)
+    print('number of split_state_mutations', len(mutations))
+    # 生成NFA
+    muts_NFA = NFA_generation(mutations, hypothesis)
+    print('number of state NFA trans', len(muts_NFA.trans))
+    # 变异分析
+    print('Starting mutation analysis...')
+    tran_dict = get_tran_dict(muts_NFA)
+    tests_valid = []
+    C = []
+    C_tests = []
+    for test in tests:
+        C_test, C = mutation_analysis(muts_NFA, test, C, tran_dict)
+        if C_test:
+            tests_valid.append(test)
+            C_tests.append(C_test)
+    # 测试筛选
+    if C_tests:
+        Tsel = test_selection(tests_valid, C, C_tests)
+    return Tsel
 
-def mutant_generation_split(hypothesis, nacc):
-    Muts = []
-    mId=0
 
-    for q in hypothesis.states:
-        set_accq = get_all_acc(hypothesis, q)
+# split-state mutation generation
+def split_state_mutation_generation(hypothesis, nacc, k, state_num, region_num, upper_guard):
+    mutations = []
+    temp_mutations = []
+    for state in hypothesis.states:
+        if state == hypothesis.sink_state:
+            continue
+        set_accq = get_all_acc(hypothesis, state, state_num)
         if len(set_accq) < 2:
             continue
         elif nacc >= len(set_accq):
@@ -354,654 +229,290 @@ def mutant_generation_split(hypothesis, nacc):
         else:
             subset_accq = random.sample(set_accq, nacc)
         for s1 in subset_accq:
-            #if len(s1) < 1:
-            #    continue
             for s2 in subset_accq:
-                #if len(s2) < 1:
-                #    continue
                 if s1 == s2:
                     continue
                 else:
-                    tMut, mId = mut_split(s1, s2, hypothesis, mId)
-                    if tMut is None:
-                        continue
-                    Muts.extend(tMut)
-    return Muts
+                    muts = split_state_operator(s1, s2, k, hypothesis)
+                    if muts is not None:
+                        temp_mutations.extend(muts)
+    for temp_mut in temp_mutations:
+        cache_trans = []
+        for i in range(len(temp_mut)):
+            if i == 0:
+                new_trans = split_tran_guard(temp_mut[i], region_num, upper_guard)
+            elif i >= len(temp_mut) - k:
+                new_trans = split_tran_guard(temp_mut[i], region_num, upper_guard)
+            else:
+                new_trans = [temp_mut[i]]
+            cache_trans.append(new_trans)
+        trans_list = [new_trans for new_trans in product(*cache_trans)]
+        mutations.extend(trans_list)
+    return mutations
 
 
-def mutant_sample(States, IMut):
-    IMutq = list(range(len(States)))
-    IMutq_num = list(range(len(States)))
-    IMuts = []
-    hypothesis = IMut[0].h
-
-    for i in range(len(States)):
-        IMutq[i] = []
-        IMutq_num[i] = 0
-    for mut in IMut:
-        for t in hypothesis.trans:
-            q = t.source
-            if t.source == mut.location_pre and t.tran_id == mut.action_pre.tran_id:
-                q = t.target
-                break
-        ii = int(q)
-        IMutq[ii].append(mut)
-        IMutq_num[ii] += 1
-    sum = int(len(IMut) / len(States))
-    for muts in IMutq:
-        if sum >= len(muts):
-            IMuts.extend(muts)
-        else:
-            mut = random.sample(muts, sum)
-            IMuts.extend(mut)
-    return IMuts
+# split-state operator
+def split_state_operator(s1, s2, k, hypothesis):
+    if len(s1) < len(s2) and s2[0:len(s1)] == s1:
+        return None
+    suffix = arg_maxs(s1, s2)
+    prefix = s1[0:len(s1) - len(suffix)]
+    if len(prefix) == 0:
+        return None
+    p_tran = prefix[len(prefix) - 1]
+    mutants = []
+    trans_list = k_step_trans(hypothesis, s1[-1].target, k)
+    for distSeq in trans_list:
+        mut_tran = [p_tran] + suffix + distSeq
+        mutants.append(mut_tran)
+    return mutants
 
 
-def NFA_mutant(hypothesis, IMut):
-    x = 0
-    S = []
-    T = list()
-    F = []
+# generation NFA-based mutant representation
+def NFA_generation(mutations, hypothesis):
+    hypothesis = deepcopy(hypothesis)
+    states = hypothesis.states
+    init_state = hypothesis.init_state
+    actions = hypothesis.actions
+    trans = hypothesis.trans
+    sink_state = hypothesis.sink_state
+    final_states = []
+    mId = 0
+    for mutation in mutations:
+        count = 0
+        source_state = mutation[0].source
+        target_state = None
+        for tran in mutation:
+            tran = deepcopy(tran)
+            target_state = str(mId) + '_' + str(count)
+            tran.source = source_state
+            tran.target = target_state
+            trans.append(tran)
+            states.append(target_state)
+            count += 1
+            source_state = target_state
+        mId += 1
+        final_states.append(target_state)
+    return NFA(states, init_state, actions, trans, sink_state, final_states)
 
-    for s in hypothesis.states:
-        S.append([s])
 
-    for ts in hypothesis.trans:
-        T.append([[ts.source], ts, [ts.target]])
-
-    for M in IMut:
-        s = [x, M.mId]
-        S.append(s)
-        x += 1
-        T.append([[M.location_pre], M.action_pre, s])
-        v = M.v_actions
-        j = 0
-        while j <= len(v) - 1:
-            ss = [x, M.mId]
-            S.append(ss)
-            x += 1
-            T.append([s, v[j], ss])
-            if j == len(v) - 1:
-                if ss not in F:
-                    F.append(ss)
-            s = ss
-            j += 1
-    NMut = NFAMut(S, [hypothesis.init_state], hypothesis.actions, T, F)
-    return NMut
-
-'''
-def mutation_analysis1(test, NMut,IMutsel):  #abandon 弃用
-    s0 = NMut.s_state
-    T = NMut.trans
-    F = NMut.f_states
-    cMut = []
-    state = [s0]
-    blocked = []
-    j = 0
-    nowTime = 0
-    while j <= len(test) - 1:
-        next = []
-        time = test[j].time + nowTime
-        newTest = TimedWord(test[j].action, time)
-        for s in state:
-            n = []
-            unblocked_trans = []
-            ifTransBlocked = False
-
-            for trans in T:
-                if trans[0] == s and trans[1].is_passing_tran(newTest):
-                    for bb in blocked:
-                        if trans[0] == bb[1][0] and trans[2] == bb[1][2] and trans[1].tran_id == bb[1][1].tran_id:
-                            ifTransBlocked = True
-                            break
-                    if not ifTransBlocked:
-                        ifTransBlocked = False
-                        unblocked_trans.append(trans)
-
-                    if trans[1].reset:
-                        nowTime = 0
-                    else:
-                        nowTime = time
-            for t in unblocked_trans:
-                if len(t[2]) == 2:
-                    sBlockTrans = False
-                    for bb in blocked:
-                        if s == bb[0]:
-                            sBlockTrans = True
-                            if not [t[2], bb[1]] in blocked:
-                                blocked.append([t[2], bb[1]])
-                            if [s, bb[1]] in blocked:
-                                blocked.remove([s, bb[1]])
-                    if not sBlockTrans:
-                        blocked.append([t[2], t])
-
-                if t[2] not in n:
-                    n.append(t[2])
-
-            b2 = get_blocked(s, blocked)
-            if len(n) == 0 and b2:
-                for b in b2:
-                    blocked.remove(b)
-            for n1 in n:
-                if n1 not in next:
-                    next.append(n1)
-        for sn in next:
-            if len(t[2]) == 2:
-                if (sn in F) and (not sn[1] in cMut):
-                    cMut.append(sn[1])
-                    if sn[1] not in IMutsel:
-                        IMutsel.append(sn[1])
-        state = next
-        j += 1
-    return cMut, IMutsel
-'''
-
-def mutation_analysis(test, NMut, IMutsel):
-    s0 = NMut.s_state
-    Trans = NMut.trans
-    F_states = NMut.f_states
-    cMut = []
-    j = 0
-    nowTime = 0
+# mutation analysis for single test using NFA-based mutant representation
+def mutation_analysis(muts_NFA, test, C, tran_dict):
+    C_test = []
 
     def tree_create(state, preTime, test_index):
         if test_index >= len(test):
-            return
-        time = test[test_index].time + preTime
-        newTest = TimedWord(test[test_index].action, time)
-
-        for tran in Trans:
-            if tran[0] == state and tran[1].is_passing_tran(newTest):
-                if tran[1].reset:
+            return True
+        cur_time = test[test_index].time + preTime
+        new_LTW = TimedWord(test[test_index].action, cur_time)
+        if state not in tran_dict.keys():
+            return True
+        cur_trans = tran_dict[state]
+        for tran in cur_trans:
+            if tran.is_passing_tran(new_LTW):
+                if tran.reset:
                     tempTime = 0
                 else:
-                    tempTime = time
-                if len(tran[2]) == 2:
-                    if tran[2] in F_states and (tran[2][1] not in cMut):
-                        cMut.append(tran[2][1])
-                        if tran[2][1] not in IMutsel:
-                            IMutsel.append(tran[2][1])
-                tree_create(tran[2], tempTime, test_index + 1)
-    tree_create(s0, nowTime, j)
-    return cMut, IMutsel
+                    tempTime = cur_time
+                if tran.target in muts_NFA.final_states:
+                    mId = tran.target.split('_')[0]
+                    if mId not in C_test:
+                        C_test.append(mId)
+                    if mId not in C:
+                        C.append(mId)
+                if tran.target == muts_NFA.sink_state:
+                    continue
+                tree_create(tran.target, tempTime, test_index + 1)
 
-'''
-def mutation_analysis1(test, NMut, IMutsel):
-    s0 = NMut.s_state
-    T = NMut.trans
-    F = NMut.f_states
-    cMut = []
-    j = 0
-    nowTime = 0
-    tree = tree_create(s0, nowTime, T, F, cMut, IMutsel, test, j)
-
-    return cMut, IMutsel
-'''
+    tree_create(muts_NFA.init_state, 0, 0)
+    return C_test, C
 
 
-def test_selection(Tests, C, Cset, nsel): #C:all mutations; Cset:cover mutation set
+# transition mutation
+def mutation_tran(hypothesis, k, region_num, upper_guard, tests):
     Tsel = []
-    intersectionEmpty = True
-    CC = copy.deepcopy(C)
-    tests = copy.deepcopy(Tests)
-    cset = copy.deepcopy(Cset)
-    while len(Tsel) < nsel and CC:
-        i, topt = arg_min(tests, CC, cset)
-        Ctopt = cset[i]
-        if not Ctopt:
-            break
-        for c in Ctopt:
-            if c in CC:
-                intersectionEmpty = False
-                break
-        if intersectionEmpty:
-            break
-        Tsel.append(topt)
-        for c in Ctopt:
-            if c in CC:
-                CC.remove(c)
+    # 生成变异体
+    mutations = tran_mutation_generation(hypothesis, k, region_num, upper_guard)
+    print('number of tran_mutations', len(mutations))
+    # 生成NFA
+    muts_NFA = NFA_generation(mutations, hypothesis)
+    print('number of tran NFA trans', len(muts_NFA.trans))
+    # 变异分析
+    print('Starting mutation analysis...')
+    tran_dict = get_tran_dict(muts_NFA)
+    tests_valid = []
+    C = []
+    C_tests = []
+    for test in tests:
+        C_test, C = mutation_analysis(muts_NFA, test, C, tran_dict)
+        if C_test:
+            tests_valid.append(test)
+            C_tests.append(C_test)
+    # 测试筛选
+    if C_tests:
+        Tsel = test_selection(tests_valid, C, C_tests)
     return Tsel
 
 
-def get_guardshift_trans(hypothesis, operator_type, upper_guard):
-    new_trans=[]
-
-    if operator_type == "restrict":
-        new_trans.extend(guard_restrict_opetator(hypothesis, upper_guard))
-    elif operator_type == "widen":
-        new_trans.extend(guard_widen_operator(hypothesis, upper_guard, 2))
-    elif operator_type == "complement":
-        new_trans.extend(guard_complement_operator(hypothesis, upper_guard, 2))
-    else:
-        return []
-    return new_trans
-
-def guard_restrict_opetator(hypothesis, upper_guard):
-    return
-
-def guard_complement_operator(hypothesis, upper_guard, times):
-    new_trans = []
-    tranId = 0
+# tran mutation generation
+def tran_mutation_generation(hypothesis, k, region_num, upper_guard):
+    mutations = []
+    step_trans_dict = {}
+    for state in hypothesis.states:
+        step_trans_dict[state] = k_step_trans(hypothesis, state, k)
     for tran in hypothesis.trans:
-        for guard in tran.guards:
-            guard_min = guard.get_min()
-            guard_max = guard.get_max()
-
-            if guard_min == 0 and guard.get_closed_min() and guard_max == float("inf"):
-                for i in range(times):
-                    gvalue = random.randint(0, upper_guard)
-                    for state in hypothesis.states:
-                        # if state == tran.target:
-                        #    continue
-                        if coin_flip(0.5):
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action,
-                                        [Guard("[0," + str(gvalue) + ")")],
-                                        tran.reset, state))
-                            tranId += 1
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action,
-                                        [Guard("[" + str(gvalue) + ",+)")],
-                                        tran.reset, state))
-                            tranId += 1
-                        else:
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action,
-                                        [Guard("(" + str(gvalue) + ",+)")],
-                                        tran.reset, state))
-                            tranId += 1
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action,
-                                        [Guard("[0," + str(gvalue) + "]")],
-                                        tran.reset, state))
-                            tranId += 1
-                continue
-            else:
-                if guard_min == 0 and guard.get_closed_min():
-                    pass
-                elif guard_min == 0 and not guard.get_closed_min():
-                    new_trans.append(
-                        OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[0,0]")], tran.reset, state))
-                    tranId += 1
-                else:
-                    step = int(guard_min / min(times, guard_min))
-                    temp_min = 0
-                    for i in range(min(times, guard_min)):
-                        if i == min(times, guard_min) - 1:
-                            if guard.get_closed_min():
-                                new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + ")")
-                            else:
-                                new_guard = Guard("[" + str(temp_min) + "," + str(guard_min) + "]")
-                        else:
-                            new_guard = Guard("[" + str(temp_min) + "," + str(temp_min + step) + ")")
-                        new_trans.append(
-                            OTATran("new" + str(tranId), tran.source, tran.action, [new_guard], tran.reset,
-                                    tran.target))
-                        tranId += 1
-                        temp_min += step
-
-                if guard_max == float("inf") or guard_max > upper_guard:
-                    pass
-                elif guard_max == upper_guard and guard.get_closed_max():
-                    pass
-                elif guard_max == upper_guard and not guard.get_closed_max():
-                    new_trans.append(
-                        OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[" + str(upper_guard) + "," + str(upper_guard) + "]")], tran.reset, state))
-                    tranId += 1
-                else:
-                    step = int(upper_guard - guard_max / min(times, upper_guard - guard_max))
-                    temp_max = guard_max
-                    for i in range(min(times, upper_guard - guard_max)):
-                        if i == 0:
-                            if guard.get_closed_max():
-                                new_guard = Guard("(" + str(temp_max) + "," + str(temp_max + step) + ")")
-                            else:
-                                new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
-                        elif i == min(times, upper_guard - guard_max) - 1:
-                            new_guard = Guard("[" + str(temp_max) + "," + str(upper_guard) + "]")
-                        else:
-                            new_guard = Guard("[" + str(temp_max) + "," + str(temp_max + step) + ")")
-                        new_trans.append(
-                            OTATran("new" + str(tranId), tran.source, tran.action, [new_guard], tran.reset,
-                                    tran.target))
-                        tranId += 1
-                        temp_max += step
-    return new_trans
+        if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
+            continue
+        trans = split_tran_guard_remove_first(tran, region_num, upper_guard)
+        for state in hypothesis.states:
+            if state != tran.target:
+                for prefix in trans:
+                    temp = deepcopy(prefix)
+                    temp.target = state
+                    for suffix in step_trans_dict[state]:
+                        mutations.append([temp] + suffix)
+    return mutations
 
 
-def guard_widen_operator(hypothesis, upper_guard, times):
-    new_trans = []
-    tranId = 0
-    for tran in hypothesis.trans:
-        for guard in tran.guards:
-            min = guard.get_min()
-            max = guard.get_max()
+# 测试筛选
+def test_selection(Tests, C, C_tests):
+    Tsel = []
+    c = deepcopy(C)  # all mutations
+    tests = deepcopy(Tests)  # tests
+    cset = deepcopy(C_tests)  # tests 对应的 cover mutation set
+    pre_set = []
+    while c:
+        cur_index = 0
+        cur_max = []
+        for i in range(len(cset)):
+            cset[i] = list(set(cset[i]).difference(set(pre_set)))
+            if len(cur_max) < len(cset[i]):
+                cur_max = cset[i]
+                cur_index = i
+        if cur_max:
+            Tsel.append(tests[cur_index])
+            pre_set = cur_max
+        else:
+            break
+    return Tsel
 
-            if min == 0 and max == float("inf"):
-                for i in range(times):
-                    gvalue = random.randint(0, upper_guard)
-                    for state in hypothesis.states:
-                        #if state == tran.target:
-                        #    continue
-                        if coin_flip(0.5):
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[0," + str(gvalue) + ")")],
-                                        tran.reset, state))
-                            tranId += 1
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[" + str(gvalue) + ",+)")],
-                                        tran.reset, state))
-                            tranId += 1
-                        else:
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("(" + str(gvalue) + ",+)")],
-                                        tran.reset, state))
-                            tranId += 1
-                            new_trans.append(
-                                OTATran("new" + str(tranId), tran.source, tran.action, [Guard("[0," + str(gvalue) + "]")],
-                                        tran.reset, state))
-                            tranId += 1
-                continue
-
-            for i in range(times):
-                min -= random.randint(1, upper_guard-1)
-                if min < 0:
-                    min = 0
-                if max != float("inf"):
-                    max += random.randint(1, upper_guard-1)
-                    if coin_flip(0.5):
-                        if coin_flip(0.5):
-                            new_guard = Guard("(" + str(min) + "," + str(max) + ")")
-                        else:
-                            new_guard = Guard("(" + str(min) + "," + str(max) + "]")
-                    else:
-                        if coin_flip(0.5):
-                            new_guard = Guard("[" + str(min) + "," + str(max) + ")")
-                        else:
-                            new_guard = Guard("[" + str(min) + "," + str(max) + "]")
-                else:
-                    if coin_flip(0.5):
-                        new_guard = Guard("(" + str(min) + ",+)")
-                    else:
-                        new_guard = Guard("[" + str(min) + ",+)")
-                new_trans.append(OTATran("new" + str(tranId), tran.source, tran.action, [new_guard], tran.reset, tran.target))
-                tranId += 1
-    return new_trans
-
-
-# --------------------------------- 算法2 - mutation testing用于测试集生成 ---------------------------------
-
-def mutation_testing_2(hypothesisOTA, upper_guard, state_num, system):
-    pass
-
-
-# --------------------------------- auxiliary function ---------------------------------
 
 # 测试执行
-def test_execution(hypothesisOTA, system, tests):
+def test_execution(hypothesis, system, tests):
     flag = True
     ctx = []
     for test in tests:
-        DRTWs, value = hypothesisOTA.test_DTWs(test)
-        realDRTWs, realValue = system.test_DTWs(test)
-        if realValue != value:
-            flag = False
-            ctx = test
-            break
+        test_list = prefixes(test)
+        for j in test_list:
+            DRTWs, value = hypothesis.test_DTWs(j)
+            realDRTWs, realValue = system.test_DTWs(j)
+            if realValue != value:
+                flag = False
+                ctx = test
+                return flag, ctx
     return flag, ctx
 
 
-def coin_flip(p):
-    return random.random() <= p
+# --------------------------------- auxiliary function --------------------------------
+
+# tests中删除cur_tests
+def remove_tested(tests, cur_tests):
+    for test in cur_tests:
+        if test in tests:
+            tests.remove(test)
+    return tests
 
 
-# find a path from s1 to s2
-def find_path(hypothesis, upper_guard, now_time, s1, s2):
-    init_now_time = now_time
-    visited = []
-    next_to_explore = queue.Queue()
-    next_to_explore.put([s1, []])
-
-    while not next_to_explore.empty():
-        [sc, path] = next_to_explore.get()
-        if path is None:
-            path = []
-        if sc not in visited:
-            visited.append(sc)
-            for i in hypothesis.actions:
-                time = random.randint(0, upper_guard * 2 + 1)
-                if time % 2 == 0:
-                    time = time // 2
-                else:
-                    time = time // 2 + 0.5
-                temp_DTW = TimedWord(i, time)
-                temp_LTW = TimedWord(i, time + now_time)
-                sn = None
-                for ts in hypothesis.trans:
-                    if ts.source == sc and ts.is_passing_tran(temp_LTW):
-                        sn = ts.target
-                        if ts.reset:
-                            now_time = 0
-                        else:
-                            now_time = temp_LTW.time
-                        break
-                if sn == s2:
-                    path.append(temp_DTW)
-                    return path, now_time
-                path1=copy.deepcopy(path)
-                next_to_explore.put([sn, path1.append(temp_DTW)])
-    return None, init_now_time
-
-'''
-def tree_create(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index):
-    nowNode = CoverATree_Node(state, preTime)
-
-    if test_index>=len(Test):
-        return nowNode
-    time = Test[test_index].time + preTime
-    newTest = TimedWord(Test[test_index].action, time)
-
-    if len(state) == 2:
-        if state in F_states and (state[1] not in cMut):
-            cMut.append(state[1])
-            if state[1] not in IMutsel:
-                IMutsel.append(state[1])
-
-    for tran in Trans:
-        if tran[0] == state and tran[1].is_passing_tran(newTest):
-            if tran[1].reset:
-                tempTime = 0
-            else:
-                tempTime = time
-
-            childNode = tree_create(tran[2], tempTime, Trans, F_states, cMut, IMutsel, Test, test_index+1)
-            nowNode.addNextStates(childNode)
-'''
-'''
-def get_next_tran(hypothesis, sn, s2, paths, max_path_length, max_paths_num, tran):
-    #next_tran = None
-    path=[]
-    
-    if sn == s2:
-        print([[i.source, i.target] for i in path])
-        if path not in paths:
-            paths.append(path)
-        return tran
-    print(paths)
-    if len(paths )> max_paths_num:
-        return tran
-    if len(path) > max_path_length:
-        return tran
-    for tran in hypothesis.trans:
-        if tran.source == sn:
-            if sn == s2:
-                print([[i.source, i.target] for i in path])
-                if path not in paths:
-                    paths.append(path)
-                return tran
-            if len(path) > max_path_length:
-                return tran
-            path.append(get_next_tran(hypothesis, tran.target, s2, paths, max_path_length,  max_paths_num, tran))
-            #if len(path)>max_path_length:
-            #    break
-            #get_next_tran(hypothesis, tran.target, s2, paths, path, max_path_length,  max_paths_num)
+# 前缀集
+def prefixes(tws):
+    new_prefixes = []
+    for i in range(1, len(tws) + 1):
+        temp_tws = tws[:i]
+        new_prefixes.append(temp_tws)
+    return new_prefixes
 
 
-    #return paths
-'''
+# 找到qs状态后走step的所有路径
+def k_step_trans(hypothesis, q, k):
+    trans_list = []
+
+    def recursion(cur_state, paths):
+        if len(paths) == k:
+            if paths not in trans_list:
+                trans_list.append(paths)
+            return True
+        for tran in hypothesis.trans:
+            if tran.source == cur_state:
+                if len(paths) > 0 and paths[-1] == tran:
+                    continue
+                recursion(tran.target, deepcopy(paths) + [tran])
+
+    recursion(q, [])
+    return trans_list
+
+
+# 将NFA中的迁移按source分组
+def get_tran_dict(muts_NFA):
+    tran_dict = {}
+    for tran in muts_NFA.trans:
+        if tran.source in tran_dict.keys():
+            tran_dict[tran.source].append(tran)
+        else:
+            tran_dict[tran.source] = [tran]
+    return tran_dict
+
+
 # get mutated access seq leading to a single state
-def get_all_acc(hypothesis, s2):
+def get_all_acc(hypothesis, state, state_num):
     paths = []
-    max_path_length = int(len(hypothesis.states) * 2.5)
+    max_path_length = min(int(len(hypothesis.states) * 1.5), state_num * 1.5)
 
     def get_next_tran(sn, path):
-        if sn == s2 and path:
+        if len(path) > max_path_length or sn == hypothesis.sink_state:
+            return True
+        if sn == state and path:
             if path not in paths:
                 paths.append(path)
-            return
-        if len(path) > max_path_length:
-            return
         for tran in hypothesis.trans:
             if tran.source == sn:
-                if len(path) >= 2 and tran.target == sn:
-                    if path[-1].source == sn and path[-2].source == sn:
-                        continue
-                get_next_tran(tran.target, copy.deepcopy(path)+[tran])
+                if len(path) > 0 and tran == path[-1]:
+                    continue
+                get_next_tran(tran.target, deepcopy(path) + [tran])
 
     get_next_tran(hypothesis.init_state, [])
     return paths
 
-# get mutated access seq leading to a single state
 
-
-
-def mut_split(s1, s2, hypothesis, mId):
-    if len(s1) < len(s2) and s2[0:len(s1)] == s1:
-        return None, mId
-    sqSuf = arg_maxs(s1, s2)
-    sqSuf_tran = []
-    if sqSuf:
-        for sq in sqSuf:
-            sqSuf_tran.append(sq)
-    ss1 = s1[0:len(s1) - len(sqSuf_tran)]
-    if len(ss1) == 0:
-        return None, mId
-    pI = ss1[len(ss1) - 1]
-    Mutants = list()
-    Ik = get_Ik(hypothesis, s1[-1].target, 1)
-    for distSeq in Ik:
-        H = hypothesis
-        qpre = pI.source
-        v = sqSuf_tran + distSeq
-        M1 = Mut(H, qpre, pI, v, mId)
-        mId += 1
-        Mutants.append(M1)
-    return Mutants, mId
-
-
-def get_Ik1(hypothesis, qs):
-    Ik = []
-    for trans1 in hypothesis.trans:
-        if trans1.source == qs:
-            for trans2 in hypothesis.trans:
-                if trans2.source == trans1.target:
-                    Ik.append([trans1] + [trans2])
-    return Ik
-
-
-# 找到 qs状态后走step的所有路径
-def get_Ik(hypothesis, qs, step):
-    IK = []
-    def recursion(cur_state, paths):
-        if len(paths) == step:
-            if paths not in IK:
-                IK.append(paths)
-            return True
-        for tran in hypothesis.trans:
-            if tran.source == cur_state:
-                recursion(tran.target, copy.deepcopy(paths) + [tran])
-    recursion(qs, [])
-    return IK
-
-
-
+# 找到s1和s2的最长公共后缀
 def arg_maxs(s1, s2):
     ts = []
-    n1 = min(len(s1), len(s2))
-    for i in range(n1):
+    if len(s1) < len(s2):
+        min_test = s1
+    else:
+        min_test = s2
+    for i in range(len(min_test)):
         if not s1[-1 - i].tran_id == s2[-1 - i].tran_id:
             break
-        ts = s1[(- 1 - i):]
+        ts = min_test[(len(min_test) - 1 - i):]
     return ts
 
 
-def arg_min(Tests, C, Cset): #C:mutations sets; Cset:cover sets
-    min = len(C)
-    index = 0
-    i = 0
-    for ct in Cset:
-        if not ct:
-            i += 1
-            continue
-        CC = copy.deepcopy(C)
-        for c in ct:
-            if c in CC:
-                CC.remove(c)
-        t_min = len(CC)
-        if t_min < min:
-            index = i
-            min = t_min
-        i += 1
-    return index, Tests[index]
+# 将迁移的guard分割
+def split_tran_guard(tran, region_num, upper_guard):
+    trans = []
+    for guard in tran.guards:
+        temp_guards = guard_split(guard, region_num, upper_guard)
+        for temp_guard in temp_guards:
+            trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, tran.target))
+    return trans
 
 
-def get_blocked(s, blocked):
-    b = []
-    for bb in blocked:
-        if s == bb[0]:
-            b.append(bb)
-    return b
-
-
-'''
-def tree_create1(state, preTime, Trans, F_states, cMut, IMutsel, Test, test_index):
-    nowNode = CoverATree_Node(state, preTime)
-
-    if test_index>=len(Test):
-        return nowNode
-    time = Test[test_index].time + preTime
-    newTest = TimedWord(Test[test_index].action, time)
-
-    if len(state) == 2:
-        if state in F_states and (state[1] not in cMut):
-            cMut.append(state[1])
-            if state[1] not in IMutsel:
-                IMutsel.append(state[1])
-
-    for tran in Trans:
-        if tran[0] == state and tran[1].is_passing_tran(newTest):
-            if tran[1].reset:
-                tempTime = 0
-            else:
-                tempTime = time
-
-            childNode = tree_create(tran[2], tempTime, Trans, F_states, cMut, IMutsel, Test, test_index+1)
-            nowNode.addNextStates(childNode)
-'''
-
-if __name__ == '__main__':
-    import json
-    from common.system import build_system, build_canonicalOTA
-    from common.make_pic import make_system
-
-    model_file = '../benchmarks/3_2_10/3_2_10-1/model.json'
-    with open(model_file, 'r') as json_model:
-        model = json.load(json_model)
-    system = build_system(model)
-    system = build_canonicalOTA(system)
-    make_system(system, 'result_path', '/model_target')
-
-    #paths_temp = get_Ik(system, system.states[1], 2)
-    paths_temp = get_all_acc(system, '1')
-    for cur_path in paths_temp:
-       print([[i.source, i.target] for i in cur_path])
+# 将迁移的guard分割 - 不取切分的第一个
+def split_tran_guard_remove_first(tran, region_num, upper_guard):
+    trans = []
+    for guard in tran.guards:
+        temp_guards = guard_split(guard, region_num, upper_guard)[1:]
+        for temp_guard in temp_guards:
+            trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, tran.target))
+            trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, tran.target))
+    return trans
