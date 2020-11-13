@@ -236,6 +236,7 @@ def split_state_mutation_generation(hypothesis, nacc, k, state_num, region_num, 
                     muts = split_state_operator(s1, s2, k, hypothesis)
                     if muts is not None:
                         temp_mutations.extend(muts)
+    '''
     for temp_mut in temp_mutations:
         cache_trans = []
         for i in range(len(temp_mut)):
@@ -248,20 +249,29 @@ def split_state_mutation_generation(hypothesis, nacc, k, state_num, region_num, 
             cache_trans.append(new_trans)
         trans_list = [new_trans for new_trans in product(*cache_trans)]
         mutations.extend(trans_list)
-    return mutations
+    '''
+    #return mutations
+    return temp_mutations
 
 
 # split-state operator
 def split_state_operator(s1, s2, k, hypothesis):
-    if len(s1) < len(s2) and s2[0:len(s1)] == s1:
-        return None
-    suffix = arg_maxs(s1, s2)
-    prefix = s1[0:len(s1) - len(suffix)]
-    if len(prefix) == 0:
-        return None
-    p_tran = prefix[len(prefix) - 1]
+    #if len(s1) < len(s2) and s2[0:len(s1)] == s1:
+    #    return None
+    suffix = []
+    #pre_action = hypothesis.init_state
+    if not s1:
+        p_tran = OTATran('', hypothesis.init_state, [], [], False, hypothesis.init_state)
+    else:
+        suffix = arg_maxs(s1, s2)
+        prefix = s1[0:len(s1) - len(suffix)]
+        if len(prefix) == 0:
+            p_tran = OTATran('', hypothesis.init_state, [], [], False, hypothesis.init_state)
+            #return None
+        else:
+            p_tran = prefix[len(prefix) - 1]
     mutants = []
-    trans_list = k_step_trans(hypothesis, s1[-1].target, k)
+    trans_list = k_step_trans(hypothesis, p_tran.source, k)
     for distSeq in trans_list:
         mut_tran = [p_tran] + suffix + distSeq
         mutants.append(mut_tran)
@@ -466,6 +476,8 @@ def get_tran_dict(muts_NFA):
 def get_all_acc(hypothesis, state, state_num):
     paths = []
     max_path_length = min(int(len(hypothesis.states) * 1.5), state_num * 1.5)
+    if state == hypothesis.init_state:
+        paths.append([])
 
     def get_next_tran(sn, path):
         if len(path) > max_path_length or sn == hypothesis.sink_state:
@@ -486,7 +498,9 @@ def get_all_acc(hypothesis, state, state_num):
 # 找到s1和s2的最长公共后缀
 def arg_maxs(s1, s2):
     ts = []
-    if len(s1) < len(s2):
+    if (not s1) or (not s2):
+        return []
+    elif len(s1) < len(s2):
         min_test = s1
     else:
         min_test = s2
