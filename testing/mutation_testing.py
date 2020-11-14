@@ -44,8 +44,8 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
     tested = []  # 缓存已测试序列
 
     mutation_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
-    # mutation_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
-    #mutation_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
+    mutation_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
+    mutation_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
     if len(mutation_tests) > 0:
         print('number of timed tests', len(mutation_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, mutation_tests)
@@ -139,16 +139,16 @@ def timed_mutation_generation(hypothesis, region_num, upper_guard, k):
             guard_min = guard.get_min()
             guard_max = guard.get_max()
             # 特殊情况处理 - [0,+)
-            if guard_min == 0 and guard.get_closed_min() and guard_max == float("inf"):
-                temp_guards = guard_split(guard, region_num, upper_guard)
-                for state in hypothesis.states:
-                    for temp_guard in temp_guards:
-                        if state == tran.target:
-                            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, state))
-                        else:
-                            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, state))
-                            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, state))
-                continue
+            #if guard_min == 0 and guard.get_closed_min() and guard_max == float("inf"):
+                #temp_guards = guard_split(guard, region_num, upper_guard)
+                #for state in hypothesis.states:
+                #    for temp_guard in temp_guards:
+                #        if state == tran.target:
+                #            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, state))
+                #        else:
+                #            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, state))
+                #            new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, state))
+                #continue
             # 正常情况处理 - 处理左边
             if guard_min == 0:
                 if not guard.get_closed_min():
@@ -272,9 +272,10 @@ def split_state_operator(s1, s2, k, hypothesis):
         else:
             p_tran = prefix[len(prefix) - 1]
     mutants = []
-    trans_list = k_step_trans(hypothesis, p_tran.source, k)
+    temp_tran = [p_tran]+suffix
+    trans_list = k_step_trans(hypothesis, temp_tran.target, k)
     for distSeq in trans_list:
-        mut_tran = [p_tran] + suffix + distSeq
+        mut_tran = temp_tran + distSeq
         mutants.append(mut_tran)
     return mutants
 
