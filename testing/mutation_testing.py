@@ -43,9 +43,9 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
 
     tested = []  # 缓存已测试序列
 
-    # mutation_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
+    mutation_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
     # mutation_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
-    mutation_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
+    #mutation_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
     if len(mutation_tests) > 0:
         print('number of timed tests', len(mutation_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, mutation_tests)
@@ -177,9 +177,10 @@ def timed_mutation_generation(hypothesis, region_num, upper_guard, k):
                     new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, tran.target))
                     new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, tran.target))
             # 正常情况处理 - 处理自身
-            temp_guards = guard_split(guard, region_num, upper_guard)
-            for temp_guard in temp_guards:
-                new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, tran.target))
+            new_trans.append(OTATran('', tran.source, tran.action, [guard], not tran.reset, tran.target))
+            #temp_guards = guard_split(guard, region_num, upper_guard)
+            #for temp_guard in temp_guards:
+            #    new_trans.append(OTATran('', tran.source, tran.action, [temp_guard], not tran.reset, tran.target))
     # 每个迁移都往后走k步
     for new_tran in new_trans:
         suffixes = k_step_trans(hypothesis, new_tran.target, k)
