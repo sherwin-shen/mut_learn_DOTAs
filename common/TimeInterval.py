@@ -277,35 +277,18 @@ def guard_split(guard, step, upper_guard):
     closed_min = '[' if guard.get_closed_min() else '('
     max_value = guard.get_max()
     closed_max = ']' if guard.get_closed_max() else ')'
-    if min_value >= upper_guard:
+    if min_value >= upper_guard or min_value + step > upper_guard:
         return [guard]
-    while min_value < upper_guard and min_value < max_value:
-        if closed_min == '(' and step % 2 != 0:
-            temp_max = min_value + (step + 1) / 2
-        elif closed_min == '(' and step % 2 == 0:
-            temp_max = min_value + step / 2
-        elif closed_min == '[' and step % 2 != 0:
-            temp_max = min_value + (step - 1) / 2
-        else:
-            temp_max = min_value + step / 2
-
-        if temp_max >= upper_guard or temp_max >= max_value:
-            break
-
-        if closed_min == '(' and step % 2 != 0:
-            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
-            closed_min = '['
-        elif closed_min == '(' and step % 2 == 0:
-            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
-            closed_min = '('
-        elif closed_min == '[' and step % 2 != 0:
-            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ']'))
-            closed_min = '('
-        else:
-            temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(temp_max) + ')'))
-            closed_min = '['
-        min_value = temp_max
-    if max_value == float('inf'):
-        max_value = '+'
-    temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(max_value) + closed_max))
+    temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(min_value + step) + ')'))
+    min_value += step
+    if max_value == float("inf"):
+        while min_value + step <= upper_guard:
+            temp_guards.append(Guard('[' + str(min_value) + ',' + str(min_value + step) + ')'))
+            min_value += step
+        temp_guards.append(Guard('[' + str(min_value) + ',+)'))
+    else:
+        while min_value + step < max_value:
+            temp_guards.append(Guard('[' + str(min_value) + ',' + str(min_value + step) + ')'))
+            min_value += step
+        temp_guards.append(Guard('[' + str(min_value) + ',' + str(max_value) + closed_max))
     return temp_guards

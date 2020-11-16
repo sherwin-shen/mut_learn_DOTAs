@@ -141,13 +141,24 @@ class System(object):
                     max_time_value = temp_max_value
         return max_time_value + 1
 
-    # Get the minimal duration of a (finite) time guard
-    def get_minimal_duration(self):
+    # Get the minimal region num of a (finite) time guard
+    def get_minimal_region_num(self):
         res = float('inf')
         for tran in self.trans:
             for guard in tran.guards:
                 if guard.get_region_num() < res:
                     res = guard.get_region_num()
+        if res == float('inf'):
+            res = 1
+        return res
+
+    # Get the minimal region num of a (finite) time guard
+    def get_minimal_duration(self):
+        res = float('inf')
+        for tran in self.trans:
+            for guard in tran.guards:
+                if guard.get_max() - guard.get_min() < res:
+                    res = guard.get_max() - guard.get_min()
         if res == float('inf'):
             res = 1
         return res
