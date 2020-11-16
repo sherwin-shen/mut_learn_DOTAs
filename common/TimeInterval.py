@@ -318,7 +318,7 @@ def guard_split(guard, step, upper_guard):
     max_value = guard.get_max()
     closed_max = ']' if guard.get_closed_max() else ')'
     if min_value >= upper_guard or min_value + step > upper_guard:
-        return [guard]
+        return []
     temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(min_value + step) + ')'))
     min_value += step
     if max_value == float("inf"):
