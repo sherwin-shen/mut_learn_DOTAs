@@ -32,6 +32,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
 
     # 参数配置 - 变异相关
     region_num = system.get_minimal_duration()  # It can also be set by the user.
+    region_num = 2
     nacc = 8
     k = 1
     nsel = 200
@@ -43,6 +44,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
 
     tested = []  # 缓存已测试序列
 
+    '''
     mutation_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
     mutation_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
     mutation_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
@@ -59,9 +61,10 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
             random_tests = random.sample(tests, nsel - len(mutation_tests))
         print('number of random tests', len(random_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, random_tests)
+    '''
 
     #######################################################
-    '''
+
     # step1: timed变异
     timed_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
     if len(timed_tests) > 0:
@@ -96,7 +99,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
                     random_tests = random.sample(tests, nsel - len(timed_tests) - len(state_tests) - len(tran_tests))
                 print('number of random tests', len(random_tests))
                 equivalent, ctx = test_execution(hypothesisOTA, system, random_tests)
-    '''
+
     ###########################################################################################################
 
     return equivalent, ctx
@@ -272,8 +275,8 @@ def split_state_operator(s1, s2, k, hypothesis):
         else:
             p_tran = prefix[len(prefix) - 1]
     mutants = []
-    temp_tran = [p_tran]+suffix
-    trans_list = k_step_trans(hypothesis, temp_tran.target, k)
+    temp_tran = [p_tran] + suffix
+    trans_list = k_step_trans(hypothesis, temp_tran[-1].target, k)
     for distSeq in trans_list:
         mut_tran = temp_tran + distSeq
         mutants.append(mut_tran)
@@ -500,9 +503,7 @@ def get_all_acc(hypothesis, state, state_num):
 # 找到s1和s2的最长公共后缀
 def arg_maxs(s1, s2):
     ts = []
-    if (not s1) or (not s2):
-        return []
-    elif len(s1) < len(s2):
+    if len(s1) < len(s2):
         min_test = s1
     else:
         min_test = s2

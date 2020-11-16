@@ -271,7 +271,7 @@ def complement_intervals(guards):
 
 
 # guard按照minimal_duration进行切分，直到超过upper_guard
-def guard_split(guard, step, upper_guard):
+def guard_split_old(guard, step, upper_guard):
     temp_guards = []
     min_value = guard.get_min()
     closed_min = '[' if guard.get_closed_min() else '('
@@ -308,4 +308,27 @@ def guard_split(guard, step, upper_guard):
     if max_value == float('inf'):
         max_value = '+'
     temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(max_value) + closed_max))
+    return temp_guards
+
+# guard按照minimal_duration进行切分，直到超过upper_guard
+def guard_split(guard, step, upper_guard):
+    temp_guards = []
+    min_value = guard.get_min()
+    closed_min = '[' if guard.get_closed_min() else '('
+    max_value = guard.get_max()
+    closed_max = ']' if guard.get_closed_max() else ')'
+    if min_value >= upper_guard or min_value + step > upper_guard:
+        return [guard]
+    temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(min_value + step) + ')'))
+    min_value += step
+    if max_value == float("inf"):
+        while min_value + step <= upper_guard:
+            temp_guards.append(Guard('[' + str(min_value) + ',' + str(min_value + step) + ')'))
+            min_value += step
+        temp_guards.append(Guard('[' + str(min_value) + ',+)'))
+    else:
+        while min_value + step < max_value:
+            temp_guards.append(Guard('[' + str(min_value) + ',' + str(min_value + step) + ')'))
+            min_value += step
+        temp_guards.append(Guard('[' + str(min_value) + ',+' + closed_max))
     return temp_guards
