@@ -330,5 +330,5 @@ def guard_split(guard, step, upper_guard):
         while min_value + step < max_value:
             temp_guards.append(Guard('[' + str(min_value) + ',' + str(min_value + step) + ')'))
             min_value += step
-        temp_guards.append(Guard('[' + str(min_value) + ',+' + closed_max))
+        temp_guards.append(Guard('[' + str(min_value) + ',' + str(max_value) + closed_max))
     return temp_guards

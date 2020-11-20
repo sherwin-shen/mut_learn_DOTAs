@@ -78,7 +78,7 @@ if __name__ == '__main__':
     for i in range(10):
         ### file directory
         # model_file = sys.argv[1]
-        model_file = "benchmarks/5_2_10/5_2_10-" + str(i + 1) + ".json"
+        model_file = "benchmarks/6_2_10/6_2_10-" + str(i + 1) + ".json"
 
         ### teacher type - smart_teacher / normal_teacher
         # teacher_type = sys.argv[2]
