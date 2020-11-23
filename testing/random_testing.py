@@ -198,7 +198,7 @@ def random_testing_4(hypothesis, upper_guard, state_num, system):
 
 
 # 测试集生成方法
-def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard):
+def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx):
     test = []
     hypothesis = copy.deepcopy(hypothesis)
     # 将迁移按照状态/有效性进行分组
@@ -215,6 +215,20 @@ def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper
     # 开始随机游走
     now_time = 0
     state = hypothesis.init_state
+
+    if prectx and coin_flip(0.5):
+        for t in prectx:
+            #temp_time = now_time + t.time
+            temp_LTW = TimedWord(t.action, now_time + t.time)
+            for tran in valid_tran_dict[state]:
+                if tran.is_passing_tran(temp_LTW):
+                    state = tran.target
+                    if tran.reset:
+                        now_time = temp_LTW.time
+                    else:
+                        now_time = 0
+
+    # 开始随机游走
     while True:
         if coin_flip(pvalid):
             if valid_tran_dict[state]:

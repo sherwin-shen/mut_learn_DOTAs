@@ -9,7 +9,7 @@ def TQs(LTWs, system):
     return LRTWs, value
 
 
-def EQs(hypothesisOTA, system):
+def EQs(hypothesisOTA, system, prectxs):
     upper_guard = system.max_time_value()  # It can also be set by the user.
     state_num = len(system.states)  # non-essential
 
@@ -23,10 +23,10 @@ def EQs(hypothesisOTA, system):
     # equivalent, ctx = random_testing_3(hypothesisOTA, upper_guard, state_num, system)
 
     # # 测试4 - 改进的随机测试（用于结合mutation testing）
-    #equivalent, ctx = random_testing_4(hypothesisOTA, upper_guard, state_num, system)
+    #equivalent, ctx = random_testing_4(hypothesisOTA, upper_guard, state_num, system, prectxs)
 
     # 测试5 - mutation-based-testing
-    equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, system)
+    equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, system, prectxs)
 
     if ctx is not None:
         ctx = minimize_counterexample(hypothesisOTA, system, ctx)

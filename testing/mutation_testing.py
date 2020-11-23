@@ -18,7 +18,7 @@ class NFA(object):
 
 
 # 基于变异的测试主函数
-def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
+def mutation_testing(hypothesisOTA, upper_guard, state_num, system, prectxs):
     equivalent = True
     ctx = None
 
@@ -32,14 +32,22 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system):
 
     # 参数配置 - 变异相关
     region_num = int((system.get_minimal_duration()+1)/2)  # It can also be set by the user.
+    region_num = int(upper_guard/5)
     nacc = 8
     k = 1
     nsel = 200
 
+    for c in prectxs:
+        if len(c) >= max_steps:
+            prectxs.remove(c)
     # 测试集生成
     tests = []
     for i in range(test_num):
-        tests.append(test_generation_4(hypothesisOTA, pretry, pstop, max_steps, pvalid, pnext, upper_guard))
+        if prectxs:
+            prectx = random.choice(prectxs)
+        else:
+            prectx = []
+        tests.append(test_generation_4(hypothesisOTA, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx))
 
     tested = []  # 缓存已测试序列
 
