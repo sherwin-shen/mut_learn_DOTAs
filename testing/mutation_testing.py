@@ -4,7 +4,7 @@ from itertools import product
 from common.TimedWord import TimedWord
 from common.hypothesis import OTATran
 from common.TimeInterval import Guard, guard_split
-from testing.random_testing import test_generation_4
+from testing.random_testing import test_generation_4, test_generation_5
 
 
 class NFA(object):
@@ -47,7 +47,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system, prectxs):
             prectx = random.choice(prectxs)
         else:
             prectx = []
-        tests.append(test_generation_4(hypothesisOTA, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx))
+        tests.append(test_generation_5(hypothesisOTA, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx))
 
     tested = []  # 缓存已测试序列
 

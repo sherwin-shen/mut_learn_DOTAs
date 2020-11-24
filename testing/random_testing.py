@@ -177,17 +177,26 @@ def test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard):
 
 
 # 随机测试算法4 - 改自随机测试算法2
-def random_testing_4(hypothesis, upper_guard, state_num, system):
+def random_testing_4(hypothesis, upper_guard, state_num, system, prectxs):
     test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 5)
     pretry = 0.9
     pstop = 0.05
     pvalid = 0.8
     pnext = 0.8
-    max_steps = int(1.5 * state_num)
+    max_steps = min(int(2 * state_num), int(2 * len(hypothesis.states)))
+
+    for c in prectxs:
+        if len(c) >= max_steps:
+            prectxs.remove(c)
 
     ctx = None
     for i in range(test_num):
-        test = test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard)
+        if prectxs:
+            prectx = random.choice(prectxs)
+        else:
+            prectx = []
+        #test = test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx)
+        test = test_generation_5(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx)
         test_list = prefixes(test)
         for j in test_list:
             flag = test_execution(hypothesis, system, j)
@@ -280,6 +289,77 @@ def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper
                 test.extend(path_dtw)
                 break
             elif coin_flip(1 - pretry):
+                break
+    return test
+
+# 测试集生成方法
+def test_generation_5(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx):
+    test = []
+    hypothesis = copy.deepcopy(hypothesis)
+    # 将迁移按照状态/有效性进行分组
+    invalid_tran_dict = {}
+    valid_tran_dict = {}
+    for state in hypothesis.states:
+        invalid_tran_dict[state] = []
+        valid_tran_dict[state] = []
+    for tran in hypothesis.trans:
+        if tran.source == hypothesis.sink_state or tran.target == hypothesis.sink_state:
+            invalid_tran_dict[tran.source].append(tran)
+        else:
+            valid_tran_dict[tran.source].append(tran)
+    # 开始随机游走
+    now_time = 0
+    state = hypothesis.init_state
+
+    #是否延续ctx
+    if prectx and coin_flip(0.5):
+        for t in prectx:
+            #temp_time = now_time + t.time
+            temp_LTW = TimedWord(t.action, now_time + t.time)
+            for tran in valid_tran_dict[state]:
+                if tran.is_passing_tran(temp_LTW):
+                    state = tran.target
+                    if tran.reset:
+                        now_time = temp_LTW.time
+                    else:
+                        now_time = 0
+
+    # 开始随机游走
+    while True:
+        delay_time = get_random_delay(upper_guard)
+        now_time += delay_time
+        if coin_flip(pvalid):
+            tran_dict = valid_tran_dict[state]
+            #continue
+        else:
+            tran_dict = invalid_tran_dict[state]
+            #continue
+        Es = []
+        for tran in tran_dict:
+            for guard in tran.guards:
+                if guard.is_in_interval(now_time):
+                    Es.append(tran)
+                    break
+        if Es:
+            selec_tran = random.choice(Es)
+            state = selec_tran.target
+            if selec_tran.reset:
+                now_time = 0
+            test.append(TimedWord(selec_tran.action, delay_time))
+
+        if state == hypothesis.sink_state:
+            break
+        if len(test) > max_steps:
+            break
+        elif coin_flip(pstop):
+            break
+    # 是否多走几步，如果为sink_state则随机走几步
+    if coin_flip(pnext):
+        linfix = math.ceil(len(hypothesis.states) / 2)
+        li = random.randint(1, linfix)
+        for i in range(li):
+            test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
+            if len(test) > max_steps:
                 break
     return test
 
