@@ -73,7 +73,7 @@ def main():
 
 if __name__ == '__main__':
     # used to reproduce experimental results
-    random.seed(3)
+    #random.seed(3)
 
     for i in range(10):
         ### file directory
