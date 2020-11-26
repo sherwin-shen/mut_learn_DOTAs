@@ -236,7 +236,6 @@ def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper
                         now_time = temp_LTW.time
                     else:
                         now_time = 0
-
     # 开始随机游走
     while True:
         if coin_flip(pvalid):
@@ -291,122 +290,27 @@ def test_generation_4(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper
                 break
             elif coin_flip(1 - pretry):
                 break
-    '''
-    if coin_flip(pnext):
-        target_state = random.choice(hypothesis.states)
-        while True:
-            path_dtw, now_time = find_path(hypothesis, upper_guard, now_time, state, target_state)
-            if path_dtw:
-                test.extend(path_dtw)
-                break
-            elif coin_flip(1 - pretry):
-                break
-    '''
     return test
 
-# 测试集生成方法
+
+#测试集生成方法（伪代码版）
 def test_generation_5(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx):
     test = []
     hypothesis = copy.deepcopy(hypothesis)
     # 将迁移按照状态/有效性进行分组
     invalid_tran_dict = {}
     valid_tran_dict = {}
+    tran_dict = {}
     for state in hypothesis.states:
         invalid_tran_dict[state] = []
         valid_tran_dict[state] = []
+        tran_dict[state] = []
     for tran in hypothesis.trans:
         if tran.source == hypothesis.sink_state or tran.target == hypothesis.sink_state:
             invalid_tran_dict[tran.source].append(tran)
         else:
             valid_tran_dict[tran.source].append(tran)
-    # 开始随机游走
-    now_time = 0
-    state = hypothesis.init_state
-
-    #是否延续ctx
-    if prectx and coin_flip(0.5):
-        for t in prectx:
-            #temp_time = now_time + t.time
-            temp_LTW = TimedWord(t.action, now_time + t.time)
-            for tran in valid_tran_dict[state]:
-                if tran.is_passing_tran(temp_LTW):
-                    state = tran.target
-                    if tran.reset:
-                        now_time = temp_LTW.time
-                    else:
-                        now_time = 0
-
-    # 开始随机游走
-    while True:
-        delay_time = get_random_delay(upper_guard)
-        now_time += delay_time
-        if coin_flip(pvalid):
-            tran_dict = valid_tran_dict[state]
-            #continue
-        else:
-            tran_dict = invalid_tran_dict[state]
-            #continue
-        Es = []
-        for tran in tran_dict:
-            for guard in tran.guards:
-                if guard.is_in_interval(now_time):
-                    Es.append(tran)
-                    break
-        if Es:
-            selec_tran = random.choice(Es)
-            state = selec_tran.target
-            if selec_tran.reset:
-                now_time = 0
-            test.append(TimedWord(selec_tran.action, delay_time))
-
-        if state == hypothesis.sink_state:
-            break
-        #if len(test) > max_steps:
-        #    break
-        elif coin_flip(pstop):
-            break
-    # 是否多走几步，如果为sink_state则随机走几步
-    '''
-    if coin_flip(pnext):
-        linfix = math.ceil(len(hypothesis.states)/2)
-        li = random.randint(1, linfix)
-        for i in range(li):
-            test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
-            if len(test) > max_steps:
-                break
-    '''
-    if state == hypothesis.sink_state:
-        linfix = math.ceil(len(hypothesis.states) / 2)
-        li = random.randint(1, linfix)
-        for i in range(li):
-            test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
-            if len(test) > max_steps:
-                break
-    elif coin_flip(pnext):
-        target_state = random.choice(hypothesis.states)
-        while True:
-            path_dtw, now_time = find_path(hypothesis, upper_guard, now_time, state, target_state)
-            if path_dtw:
-                test.extend(path_dtw)
-                break
-            elif coin_flip(1 - pretry):
-                break
-    return test
-
-def test_generation_6(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper_guard, prectx):
-    test = []
-    hypothesis = copy.deepcopy(hypothesis)
-    # 将迁移按照状态/有效性进行分组
-    invalid_tran_dict = {}
-    valid_tran_dict = {}
-    for state in hypothesis.states:
-        invalid_tran_dict[state] = []
-        valid_tran_dict[state] = []
-    for tran in hypothesis.trans:
-        if tran.source == hypothesis.sink_state or tran.target == hypothesis.sink_state:
-            invalid_tran_dict[tran.source].append(tran)
-        else:
-            valid_tran_dict[tran.source].append(tran)
+        tran_dict[tran.source].append(tran)
     # 开始随机游走
     now_time = 0
     state = hypothesis.init_state
@@ -424,7 +328,7 @@ def test_generation_6(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper
                         now_time = 0
 
     # 开始随机游走
-    while True:
+    while len(test) < max_steps:
         if coin_flip(pvalid):
             if valid_tran_dict[state]:
                 next_tran = random.choice(valid_tran_dict[state])
@@ -455,18 +359,14 @@ def test_generation_6(hypothesis, pretry, pstop, max_steps, pvalid, pnext, upper
                 continue
         #if state == hypothesis.sink_state:
         #    break
-        if len(test) > max_steps:
+        if coin_flip(pstop):
             break
-        elif coin_flip(pstop):
-            break
-    # 是否多走几步，如果为sink_state则随机走几步
+    # 选择新的状态并找到路径
     if coin_flip(pnext):
-        linfix = math.ceil(len(hypothesis.states) / 2)
-        li = random.randint(1, linfix)
-        for i in range(li):
-            test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
-            if len(test) > max_steps:
-                break
+        target_state = random.choice(hypothesis.states)
+        path_dtw, now_time = find_path_1(hypothesis, upper_guard, now_time, state, target_state, tran_dict)
+        if path_dtw is not None:
+            test.extend(path_dtw)
 
     return test
 
@@ -507,10 +407,10 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
     init_now_time = now_time
     visited = []
     next_to_explore = queue.Queue()
-    next_to_explore.put([s1, []])
+    next_to_explore.put([s1, init_now_time, []])
 
     while not next_to_explore.empty():
-        [sc, path] = next_to_explore.get()
+        [sc, n_time, path] = next_to_explore.get()
         if path is None:
             path = []
         if sc not in visited:
@@ -518,20 +418,52 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2):
             for i in hypothesis.actions:
                 time = get_random_delay(upper_guard)
                 temp_DTW = TimedWord(i, time)
-                temp_LTW = TimedWord(i, time + now_time)
+                temp_LTW = TimedWord(i, time + n_time)
                 sn = None
                 for ts in hypothesis.trans:
                     if ts.source == sc and ts.is_passing_tran(temp_LTW):
                         sn = ts.target
                         if ts.reset:
-                            now_time = 0
+                            n_time = 0
                         else:
-                            now_time = temp_LTW.time
+                            n_time = temp_LTW.time
                         break
                 if sn == s2:
                     path.append(temp_DTW)
-                    return path, now_time
-                next_to_explore.put([sn, copy.deepcopy(path).append(temp_DTW)])
+                    return path, n_time
+                next_to_explore.put([sn, n_time, copy.deepcopy(path).append(temp_DTW)])
+    return None, init_now_time
+
+def find_path_1(hypothesis, upper_guard, now_time, s1, s2, tran_dict):
+    init_now_time = now_time
+    visited = []
+    next_to_explore = queue.Queue()
+    next_to_explore.put([s1, init_now_time, []])
+
+    for state in hypothesis. states:
+        random.shuffle(tran_dict[state])
+
+    while not next_to_explore.empty():
+        [sc, n_time, path] = next_to_explore.get()
+        if path is None:
+            path = []
+        if sc not in visited:
+            visited.append(sc)
+            for ts in tran_dict[sc]:
+                sn = ts.target
+                delay_time = get_time_from_tran(ts, n_time, upper_guard)
+                if delay_time is None:
+                    continue
+                temp_DTW = TimedWord(ts.action, delay_time)
+                if ts.reset:
+                    n_time = 0
+                else:
+                    n_time += delay_time
+                #break
+                if sn == s2:
+                    path.append(temp_DTW)
+                    return path, n_time
+                next_to_explore.put([sn, n_time, copy.deepcopy(path).append(temp_DTW)])
     return None, init_now_time
 
 
