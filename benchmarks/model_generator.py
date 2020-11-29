@@ -19,9 +19,9 @@ class Tran:
 
 def main():
     # 配置参数
-    file_name = '4_2_10'
+    file_name = '6_2_50'
     state_num, input_num, guard_upper_bound = [int(i) for i in file_name.split('_')]
-    partition_size = 2
+    partition_size = 3
 
     # 开始生成
     name = file_name
@@ -78,7 +78,7 @@ def get_trans_from_curState(source, tran_id, states, inputs, guard_upper_bound, 
     trans = []
     reach_states = set()
     for input in inputs:
-        if random.random() > 0.5:
+        if random.random() > 0.3:
             continue
         next_trans_num, guards = get_random_guards(guard_upper_bound, partition_size)
         for i in range(next_trans_num):
@@ -129,7 +129,7 @@ def get_random_guards(guard_upper_bound, partition_size):
             right = ')'
         temp_guard = left + str(endpoint_list[i]) + ',' + str(endpoint_list[i + 1]) + right
         guards.append(temp_guard)
-    guards_num = random.randint(1, partition_size)
+    guards_num = random.randint(1, random.randint(1, partition_size))
     guards = random.sample(guards, guards_num)
     return guards_num, guards
 
