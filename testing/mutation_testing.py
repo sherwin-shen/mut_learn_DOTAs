@@ -73,22 +73,23 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system, prectxs):
     #######################################################
 
     # step1: timed变异
-    timed_tests = mutation_timed(hypothesisOTA, region_num, upper_guard, k, tests)
-    if len(timed_tests) > 0:
-        print('number of timed tests', len(timed_tests))
-        equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
-        tested = timed_tests
+    tran_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
+    if len(tran_tests) > 0:
+        print('number of timed tests', len(tran_tests))
+        equivalent, ctx = test_execution(hypothesisOTA, system, tran_tests)
+        tested = tran_tests
 
     # step2: 如果未找到反例, transition变异
     if equivalent:
-        tran_tests = mutation_tran(hypothesisOTA, k, region_num, upper_guard, tests)
-        if len(tran_tests) > 0:
-            tran_tests = remove_tested(tran_tests, tested)
-            print('number of tran tests', len(tran_tests))
-            equivalent, ctx = test_execution(hypothesisOTA, system, tran_tests)
-            tested += tran_tests
+        state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
+        if len(state_tests) > 0:
+            state_tests = remove_tested(state_tests, tested)
+            print('number of tran tests', len(state_tests))
+            equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
+            tested += state_tests
 
         # step3: 如果未找到反例, state变异
+        '''
         if equivalent:
             state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, region_num, upper_guard, tests)
             if len(state_tests) > 0:
@@ -96,19 +97,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, system, prectxs):
                 print('number of state tests', len(state_tests))
                 equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
                 tested += state_tests
-
-            '''
-            # step4: 随机选取测试集直到数量满足nsel
-                if equivalent and len(timed_tests) + len(state_tests) + len(tran_tests) < nsel:
-                    tests = remove_tested(tests, tested)
-                    if nsel - len(timed_tests) - len(state_tests) - len(tran_tests) > len(tests):
-                        random_tests = tests
-                    else:
-                        random_tests = random.sample(tests, nsel - len(timed_tests) - len(state_tests) - len(tran_tests))
-                    print('number of random tests', len(random_tests))
-                    equivalent, ctx = test_execution(hypothesisOTA, system, random_tests)
-            '''
-
+        '''
     ###########################################################################################################
 
     return equivalent, ctx
@@ -521,14 +510,14 @@ def mutation_tran(hypothesis, k, region_num, upper_guard, tests):
 def tran_mutation_generation(hypothesis, k, region_num, upper_guard):
     mutations = []
     new_trans = []
-    step_trans_dict = {}
+    #step_trans_dict = {}
     mut_num = 0
-    for state in hypothesis.states:
-        step_trans_dict[state] = k_step_trans(hypothesis, state, k)
+    #for state in hypothesis.states:
+        #step_trans_dict[state] = k_step_trans(hypothesis, state, k)
     for tran in hypothesis.trans:
         if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
             continue
-        trans = split_tran_guard_remove_first(tran, region_num, upper_guard)
+        trans = split_tran_guard(tran, region_num, upper_guard)
         for state in hypothesis.states:
             #if random.random() > 0.5:
             #    continue
@@ -670,7 +659,7 @@ def arg_maxs(s1, s2):
 
 
 # 将迁移的guard分割
-def split_tran_guard(tran, region_num, upper_guard):
+def split_tran_guard_0(tran, region_num, upper_guard):
     trans = []
     for guard in tran.guards:
         temp_guards = guard_split(guard, region_num, upper_guard)
@@ -680,7 +669,7 @@ def split_tran_guard(tran, region_num, upper_guard):
 
 
 # 将迁移的guard分割 - 不取切分的第一个???
-def split_tran_guard_remove_first(tran, region_num, upper_guard):
+def split_tran_guard(tran, region_num, upper_guard):
     trans = []
     for guard in tran.guards:
         temp_guards = guard_split(guard, region_num, upper_guard)
