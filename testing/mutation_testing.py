@@ -528,8 +528,12 @@ def tran_mutation_generation(hypothesis, k, region_num, upper_guard):
                     temp.tran_id = 'tran' + str(mut_num)
                     mut_num += 1
                     new_trans.append(temp)
-                    #for suffix in step_trans_dict[state]:
-                    #    mutations.append([temp] + suffix)
+            else:
+                temp = deepcopy(tran)
+                temp.reset = not tran.reset
+                temp.tran_id = 'tran' + str(mut_num)
+                mut_num += 1
+                new_trans.append(temp)
     return mutations, new_trans
 
 
