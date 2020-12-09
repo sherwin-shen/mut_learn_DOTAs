@@ -45,12 +45,10 @@ def random_testing_2(hypothesis, upper_guard, state_num, system):
     ctx = None
     for i in range(test_num):
         test = test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
-        test_list = prefixes(test)
-        for j in test_list:
-            flag = test_execution(hypothesis, system, j)
-            if flag:
-                ctx = test
-                return False, ctx
+        flag = test_execution(hypothesis, system, test)
+        if flag:
+            ctx = test
+            return False, ctx
     return True, ctx
 
 
@@ -120,12 +118,10 @@ def random_testing_3(hypothesis, upper_guard, state_num, system):
     ctx = None
     for i in range(test_num):
         test = test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard)
-        test_list = prefixes(test)
-        for j in test_list:
-            flag = test_execution(hypothesis, system, j)
-            if flag:
-                ctx = test
-                return False, ctx
+        flag = test_execution(hypothesis, system, test)
+        if flag:
+            ctx = test
+            return False, ctx
     return True, ctx
 
 
@@ -188,12 +184,10 @@ def random_testing_4(hypothesis, upper_guard, state_num, pre_ctx, system):
     ctx = None
     for i in range(test_num):
         test = test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx)
-        test_list = prefixes(test)
-        for j in test_list:
-            flag = test_execution(hypothesis, system, j)
-            if flag:
-                ctx = test
-                return False, ctx
+        flag = test_execution(hypothesis, system, test)
+        if flag:
+            ctx = test
+            return False, ctx
     return True, ctx
 
 

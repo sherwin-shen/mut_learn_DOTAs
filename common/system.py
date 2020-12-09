@@ -1,5 +1,5 @@
 from common.TimedWord import TimedWord, ResetTimedWord
-from common.TimeInterval import Guard, BracketNum, Bracket, complement_intervals
+from common.TimeInterval import Guard, complement_intervals
 from common.hypothesis import OTA, OTATran
 
 
@@ -15,6 +15,7 @@ class System(object):
         self.eq_num = 0
         self.test_num = 0
         self.test_num_cache = 0
+        self.action_num = 0
         self.cache = {}
 
     # Perform tests(DTWs) on the system, return value and DRTWs(full)
@@ -26,10 +27,11 @@ class System(object):
         self.test_num_cache += 1
 
         DRTWs = []
-        value = None
+        value = []
         now_time = 0
         cur_state = self.init_state
         for dtw in DTWs:
+            self.action_num += 1
             time = dtw.time + now_time
             new_LTW = TimedWord(dtw.action, time)
             flag = False
@@ -47,19 +49,20 @@ class System(object):
                     break
             if not flag:
                 DRTWs.append(ResetTimedWord(dtw.action, dtw.time, True))
-                value = -1
+                value.append(-1)
                 break
+            else:
+                if cur_state in self.accept_states:
+                    value.append(1)
+                else:
+                    value.append(0)
         # 补全
         len_diff = len(DTWs) - len(DRTWs)
         if len_diff != 0:
             temp = DTWs[len(DRTWs):]
             for i in temp:
+                value.append(-1)
                 DRTWs.append(ResetTimedWord(i.action, i.time, True))
-        if value != -1:
-            if cur_state in self.accept_states:
-                value = 1
-            else:
-                value = 0
         self.cache[tuple_DTWs] = [DRTWs, value]
         return DRTWs, value
 
@@ -105,28 +108,22 @@ class System(object):
         value = None
         reset = False
         tran_flag = False  # tranFlag为true表示有这样的迁移
-        if DTW is None:
-            if cur_state in self.accept_states:
-                value = 1
-            else:
-                value = 0
-        else:
-            LTW = TimedWord(DTW.action, DTW.time + now_time)
-            for tran in self.trans:
-                if tran.source == cur_state and tran.is_passing_tran(LTW):
-                    tran_flag = True
-                    cur_state = tran.target
-                    reset = True if tran.reset else False
-                    break
-            if not tran_flag:
-                value = -1
-                cur_state = 'sink'
-                reset = True
-            if cur_state in self.accept_states:
-                value = 1
-            elif cur_state != 'sink':
-                value = 0
-            return cur_state, value, reset
+        LTW = TimedWord(DTW.action, DTW.time + now_time)
+        for tran in self.trans:
+            if tran.source == cur_state and tran.is_passing_tran(LTW):
+                tran_flag = True
+                cur_state = tran.target
+                reset = True if tran.reset else False
+                break
+        if not tran_flag:
+            value = -1
+            cur_state = 'sink'
+            reset = True
+        if cur_state in self.accept_states:
+            value = 1
+        elif cur_state != 'sink':
+            value = 0
+        return cur_state, value, reset
 
     # Get the max time value constant appearing in OTA.
     def max_time_value(self):

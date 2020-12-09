@@ -353,14 +353,12 @@ def test_execution(hypothesis, system, tests):
     flag = True
     ctx = []
     for test in tests:
-        test_list = prefixes(test)
-        for j in test_list:
-            DRTWs, value = hypothesis.test_DTWs(j)
-            realDRTWs, realValue = system.test_DTWs(j)
-            if realValue != value:
-                flag = False
-                ctx = test
-                return flag, ctx
+        DRTWs, value = hypothesis.test_DTWs(test)
+        realDRTWs, realValue = system.test_DTWs(test)
+        if realValue != value:
+            flag = False
+            ctx = test
+            return flag, ctx
     return flag, ctx
 
 
@@ -372,15 +370,6 @@ def remove_tested(tests, cur_tests):
         if test in tests:
             tests.remove(test)
     return tests
-
-
-# 前缀集
-def prefixes(tws):
-    new_prefixes = []
-    for i in range(1, len(tws) + 1):
-        temp_tws = tws[:i]
-        new_prefixes.append(temp_tws)
-    return new_prefixes
 
 
 # 将NFA中的迁移按source分组

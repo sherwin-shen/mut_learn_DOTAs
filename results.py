@@ -10,5 +10,6 @@ for i in range(10):
     print(model["eqNum"])
     print(model["testNum"])
     print(model["testNumCache"])
+    print(model["actionNum"])
     print(model["passingRate"])
     print(model["correct"])
