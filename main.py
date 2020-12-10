@@ -20,7 +20,7 @@ def main():
     start_time = time.time()
     print("********** learning starting *************")
     if teacher_type == "smart_teacher":
-        learned_system, mq_num, eq_num, test_num, test_num_cache, table_num = learnOTA_smart(system, debug_flag)
+        learned_system, mq_num, eq_num, test_num, test_num_cache, action_num, table_num = learnOTA_smart(system, debug_flag)
     elif teacher_type == "normal_teacher":
         raise Exception('暂不支持 normal_teacher！')
     else:
@@ -43,6 +43,7 @@ def main():
         print("Total number of EQs: " + str(eq_num))
         print("Total number of tests (no-cache): " + str(test_num))
         print("Total number of tests (with-cache): " + str(test_num_cache))
+        print("Total number of actions: " + str(action_num))
         print("Total number of tables explored: " + str(table_num))
         print("Completely correct: " + str(correct_flag) + "   Testing pass rate: " + str(passing_rate))
         print("*********** learning ending  *************")
@@ -56,6 +57,7 @@ def main():
             "eqNum": eq_num,
             "testNum": test_num,
             "testNumCache": test_num_cache,
+            "actionNum": action_num,
             "tableNum": table_num,
             "correct": correct_flag,
             "passingRate": passing_rate,
@@ -73,16 +75,15 @@ def main():
 
 if __name__ == '__main__':
     # used to reproduce experimental results
-    #random.seed(3)
+    random.seed(3)
 
     for i in range(10):
         ### file directory
         # model_file = sys.argv[1]
-        model_file = "benchmarks/4_2_10/4_2_10-" + str(i + 1) + ".json"
+        model_file = "benchmarks/3_2_10/3_2_10-" + str(i + 1) + ".json"
 
         ### teacher type - smart_teacher / normal_teacher
         # teacher_type = sys.argv[2]
-
         teacher_type = "smart_teacher"
 
         # results file directory

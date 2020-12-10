@@ -35,6 +35,7 @@ class OTA(object):
     # Perform tests(DTWs) on the hypothesis(smart teacher), return value and DRTWs(full)
     def test_DTWs(self, DTWs):
         DRTWs = []
+        value = []
         now_time = 0
         cur_state = self.init_state
         for dtw in DTWs:
@@ -54,12 +55,12 @@ class OTA(object):
                             reset = False
                         DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
                         break
-        if cur_state in self.accept_states:
-            value = 1
-        elif cur_state == self.sink_state:
-            value = -1
-        else:
-            value = 0
+            if cur_state in self.accept_states:
+                value.append(1)
+            elif cur_state == self.sink_state:
+                value.append(-1)
+            else:
+                value.append(0)
         return DRTWs, value
 
     # Get the max time value constant appearing in OTA.
