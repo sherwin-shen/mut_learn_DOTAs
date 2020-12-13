@@ -25,7 +25,6 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     pstart = 0.4
     pstop = 0.05
     pvalid = 0.8
-    pnext = 0.8
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
 
@@ -37,7 +36,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     # 测试集生成
     tests = []
     for i in range(test_num):
-        tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx))
+        tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, max_steps, upper_guard, pre_ctx))
 
     tested = []  # 缓存已测试序列
     # step1: timed变异

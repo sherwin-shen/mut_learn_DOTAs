@@ -178,12 +178,11 @@ def random_testing_4(hypothesis, upper_guard, state_num, pre_ctx, system):
     p_start = 0.4
     pstop = 0.05
     pvalid = 0.8
-    pnext = 0.8
     max_steps = min(int(2 * state_num), int(2 * len(hypothesis.states)))
 
     ctx = None
     for i in range(test_num):
-        test = test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx)
+        test = test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard, pre_ctx)
         flag = test_execution(hypothesis, system, test)
         if flag:
             ctx = test
@@ -192,7 +191,7 @@ def random_testing_4(hypothesis, upper_guard, state_num, pre_ctx, system):
 
 
 # 测试集生成方法
-def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx):
+def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard, pre_ctx):
     test = []
     hypothesis = copy.deepcopy(hypothesis)
     # 将迁移按照状态/有效性进行分组
@@ -213,6 +212,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
     # 开始
     now_time = 0
     state = hypothesis.init_state
+    non_passed_state = copy.deepcopy(hypothesis.states)
+    non_passed_state.remove(state)
     # 是否从前一反例出发
     if coin_flip(p_start) and len(pre_ctx) < max_steps:
         for t in pre_ctx:
@@ -225,6 +226,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                     else:
                         now_time = 0
                     break
+            if state in non_passed_state:
+                non_passed_state.remove(state)
         test = test + pre_ctx
     # 随机游走
     while len(test) < max_steps:
@@ -256,11 +259,13 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                     now_time += delay_time
             else:
                 continue
+        if state in non_passed_state:
+            non_passed_state.remove(state)
         if coin_flip(pstop):
             break
     # 选择新的状态并找到路径
-    if coin_flip(pnext):
-        target_state = random.choice(hypothesis.states)
+    if non_passed_state:
+        target_state = random.choice(non_passed_state)
         path_dtw = find_path(hypothesis, upper_guard, now_time, state, target_state, tran_dict)
         if path_dtw:
             test.extend(path_dtw)

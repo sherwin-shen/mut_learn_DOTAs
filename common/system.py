@@ -154,6 +154,8 @@ class System(object):
         res = float('inf')
         for tran in self.trans:
             for guard in tran.guards:
+                if guard.get_min() != 0 and guard.get_min() < res:
+                    res = guard.get_min()
                 if guard.get_max() - guard.get_min() < res:
                     res = guard.get_max() - guard.get_min()
         if res == float('inf'):
