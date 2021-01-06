@@ -77,26 +77,56 @@ if __name__ == '__main__':
     # used to reproduce experimental results
     random.seed(3)
 
-    for j in range(10):
-        for i in range(10):
-            ### file directory
-            # model_file = sys.argv[1]
-            model_file = "benchmarks/8_2_10/8_2_10-" + str(i + 1) + ".json"
+    pathh = ["6_2_20", "6_2_50","6_4_10","6_6_10"]
 
-            ### teacher type - smart_teacher / normal_teacher
-            # teacher_type = sys.argv[2]
-            teacher_type = "smart_teacher"
 
-            # results file directory
-            temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
-            #result_path = 'results/' + teacher_type + '/' + 'random' + '/' + temp_path
-            result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
+    for mark_name in pathh:
+    #for k in range(8):
+        for j in range(30):#每个模型跑j遍
+            for i in range(3):
+                ### file directory
+                # model_file = sys.argv[1]
+                #mark_name = str(k+3) + "_2_10"
+                #model_file = "benchmarks/5_2_10/5_2_10-" + str(i + 1) + ".json"
+                model_file = "benchmarks/" + mark_name + "/" + mark_name + "-" + str(i + 1) + ".json"
 
-            # debug mode
-            debug_flag = False
+                ### teacher type - smart_teacher / normal_teacher
+                # teacher_type = sys.argv[2]
+                teacher_type = "smart_teacher"
 
-            ### start running experiment
-            result = main()
-            # save results
-            with open(result_path + "/result.json", 'w') as json_file:
-                json_file.write(json.dumps(result, indent=2))
+                # results file directory
+                temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
+                #result_path = 'results/' + teacher_type + '/' + 'random' + '/' + temp_path
+                result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
+
+                # debug mode
+                debug_flag = False
+
+                ### start running experiment
+                result = main()
+                # save results
+                with open(result_path + "/result.json", 'w') as json_file:
+                    json_file.write(json.dumps(result, indent=2))
+
+
+    '''
+    model_file = "benchmarks/AKM.json"
+
+    ### teacher type - smart_teacher / normal_teacher
+    # teacher_type = sys.argv[2]
+    teacher_type = "smart_teacher"
+
+    # results file directory
+    temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0]
+    #result_path = 'results/' + teacher_type + '/' + 'random' + '/' + temp_path
+    result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
+
+    # debug mode
+    debug_flag = False
+
+    ### start running experiment
+    result = main()
+    # save results
+    with open(result_path + "/result.json", 'w') as json_file:
+        json_file.write(json.dumps(result, indent=2))
+    '''

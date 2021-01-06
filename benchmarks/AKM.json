@@ -1,0 +1,337 @@
+{
+  "states": [
+    "s0",
+    "s1",
+    "s1p",
+    "s2",
+    "s3",
+    "s0_Auth",
+    "s0_AssoReq",
+    "s0_ProbeReq",
+    "s1_Auth",
+    "s1_AssoReq",
+    "s1_ProbeReq",
+    "s2_Auth",
+    "s2_AssoReq",
+    "s2_ProbeReq",
+    "s3_Auth",
+    "s3_AssoReq",
+    "s3_ProbeReq"
+  ],
+  "inputs": [
+    "?Auth",
+    "?AssoReq",
+    "?Disas",
+    "?Deauth",
+    "?ProbeReq",
+    "!Auth(success)",
+    "!Deauth(auth-expired)",
+    "!Deauth(STA-not-auth)",
+    "!Deauth(class3-from-nonass) + Deauth(STA-not-auth)",
+    "!AssoResp(success) + E1(KD=WPA2|CS=SHA1)",
+    "!ProbeResp",
+    "!Disas(inactivity)"
+  ],
+  "trans": {
+    "0": [
+      "s0",
+      "?AssoReq",
+      "[0,+)",
+      "r",
+      "s0_AssoReq"
+    ],
+    "1": [
+      "s0",
+      "?Deauth",
+      "[0,+)",
+      "r",
+      "s0"
+    ],
+    "2": [
+      "s0",
+      "?ProbeReq",
+      "[0,+)",
+      "r",
+      "s0_ProbeReq"
+    ],
+    "3": [
+      "s0",
+      "?Auth",
+      "[0,+)",
+      "r",
+      "s0_Auth"
+    ],
+    "4": [
+      "s0",
+      "?Disas",
+      "[0,+)",
+      "r",
+      "s2"
+    ],
+    "5": [
+      "s0_AssoReq",
+      "!Deauth(STA-not-auth)",
+      "[0,0]",
+      "n",
+      "s0"
+    ],
+    "6": [
+      "s0_ProbeReq",
+      "!ProbeResp",
+      "[0,0]",
+      "n",
+      "s0"
+    ],
+    "7": [
+      "s0_Auth",
+      "!Auth(success)",
+      "[0,0]",
+      "n",
+      "s1"
+    ],
+    "8": [
+      "s1",
+      "!Deauth(auth-expired)",
+      "[1,+)",
+      "n",
+      "s0"
+    ],
+    "9": [
+      "s1",
+      "?Auth",
+      "[0,1)",
+      "r",
+      "s1_Auth"
+    ],
+    "10": [
+      "s1",
+      "?AssoReq",
+      "[0,1)",
+      "r",
+      "s1_AssoReq"
+    ],
+    "11": [
+      "s1",
+      "?Deauth",
+      "[0,1)",
+      "r",
+      "s0"
+    ],
+    "12": [
+      "s1",
+      "?Disas",
+      "[0,1)",
+      "r",
+      "s2"
+    ],
+    "13": [
+      "s1",
+      "?ProbeReq",
+      "[0,1)",
+      "r",
+      "s1_ProbeReq"
+    ],
+    "14": [
+      "s1_Auth",
+      "!Auth(success)",
+      "[0,0]",
+      "n",
+      "s1"
+    ],
+    "15": [
+      "s1_AssoReq",
+      "!AssoResp(success) + E1(KD=WPA2|CS=SHA1)",
+      "[0,0]",
+      "n",
+      "s3"
+    ],
+    "16": [
+      "s1_ProbeReq",
+      "!ProbeResp",
+      "[0,0]",
+      "n",
+      "s0"
+    ],
+    "17": [
+      "s2",
+      "?Auth",
+      "[0,+)",
+      "r",
+      "s2_Auth"
+    ],
+    "18": [
+      "s2",
+      "?AssoReq",
+      "[0,+)",
+      "r",
+      "s2_AssoReq"
+    ],
+    "19": [
+      "s2",
+      "?Deauth",
+      "[0,+)",
+      "r",
+      "s2"
+    ],
+    "20": [
+      "s2",
+      "?Disas",
+      "[0,+)",
+      "r",
+      "s2"
+    ],
+    "21": [
+      "s2",
+      "?ProbeReq",
+      "[0,+)",
+      "r",
+      "s2_ProbeReq"
+    ],
+    "22": [
+      "s2_Auth",
+      "!Auth(success)",
+      "[0,0]",
+      "n",
+      "s1"
+    ],
+    "23": [
+      "s2_AssoReq",
+      "!Deauth(class3-from-nonass) + Deauth(STA-not-auth)",
+      "[0,0]",
+      "n",
+      "s2"
+    ],
+    "24": [
+      "s2_ProbeReq",
+      "!ProbeResp",
+      "[0,0]",
+      "n",
+      "s2"
+    ],
+    "25": [
+      "s3",
+      "!Disas(inactivity)",
+      "[5,+)",
+      "n",
+      "s0"
+    ],
+    "26": [
+      "s3",
+      "?Auth",
+      "[0,5)",
+      "r",
+      "s3_Auth"
+    ],
+    "27": [
+      "s3",
+      "?AssoReq",
+      "[0,5)",
+      "r",
+      "s3_AssoReq"
+    ],
+    "28": [
+      "s3",
+      "?Deauth",
+      "[0,5)",
+      "r",
+      "s0"
+    ],
+    "29": [
+      "s3",
+      "?Disas",
+      "[0,5)",
+      "r",
+      "s2"
+    ],
+    "30": [
+      "s3",
+      "?ProbeReq",
+      "[0,5)",
+      "r",
+      "s3_ProbeReq"
+    ],
+    "31": [
+      "s3_Auth",
+      "!Auth(success)",
+      "[0,0]",
+      "n",
+      "s1p"
+    ],
+    "32": [
+      "s3_AssoReq",
+      "!AssoResp(success) + E1(KD=WPA2|CS=SHA1)",
+      "[0,0]",
+      "n",
+      "s3"
+    ],
+    "33": [
+      "s3_ProbeReq",
+      "!ProbeResp",
+      "[0,0]",
+      "n",
+      "s0"
+    ],
+    "34": [
+      "s1p",
+      "!Deauth(auth-expired)",
+      "[2,+)",
+      "n",
+      "s0"
+    ],
+    "35": [
+      "s1p",
+      "?Auth",
+      "[0,2)",
+      "r",
+      "s1_Auth"
+    ],
+    "36": [
+      "s1p",
+      "?AssoReq",
+      "[0,2)",
+      "r",
+      "s1_AssoReq"
+    ],
+    "37": [
+      "s1p",
+      "?Deauth",
+      "[0,2)",
+      "r",
+      "s0"
+    ],
+    "38": [
+      "s1p",
+      "?Disas",
+      "[0,2)",
+      "r",
+      "s2"
+    ],
+    "39": [
+      "s1p",
+      "?ProbeReq",
+      "[0,2)",
+      "r",
+      "s1_ProbeReq"
+    ]
+  },
+  "initState": "s0",
+  "acceptStates": [
+    "s0",
+    "s1",
+    "s1p",
+    "s2",
+    "s3",
+    "s0_Auth",
+    "s0_AssoReq",
+    "s0_ProbeReq",
+    "s1_Auth",
+    "s1_AssoReq",
+    "s1_ProbeReq",
+    "s2_Auth",
+    "s2_AssoReq",
+    "s2_ProbeReq",
+    "s3_Auth",
+    "s3_AssoReq",
+    "s3_ProbeReq"
+  ]
+}

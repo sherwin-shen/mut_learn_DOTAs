@@ -31,6 +31,8 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
 
     # 参数配置 - 变异相关
     duration = system.get_minimal_duration()  # It can also be set by the user.
+    if duration < 1:
+        duration = 1
     nacc = 8
     k = 1
 
@@ -40,14 +42,15 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
         tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx))
 
     tested = []  # 缓存已测试序列
+
     # step1: timed变异
     timed_tests = mutation_timed(hypothesisOTA, duration, upper_guard, tests)
     if len(timed_tests) > 0:
         print('number of timed tests', len(timed_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
         tested = timed_tests
-
-    # step2: 如果未找到反例, state变异
+       
+    # step2: 如果未找到反例, state变异    
     if equivalent:
         state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, tests)
         if len(state_tests) > 0:
@@ -55,6 +58,22 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
             print('number of state tests', len(state_tests))
             equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
             tested += state_tests
+
+    '''
+    timed_tests = mutation_timed(hypothesisOTA, duration, upper_guard, tests)
+    if len(timed_tests) > 0:
+        print('number of timed tests', len(timed_tests))
+        equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
+        tested = timed_tests
+
+    state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, tests)
+    if len(state_tests) > 0:
+        state_tests = remove_tested(state_tests, tested)
+        print('number of state tests', len(state_tests))
+        equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
+        tested += state_tests
+    '''
+
 
         # # step3: 随机选取测试集直到数量满足nsel
         # if equivalent and len(timed_tests) + len(state_tests) < nsel:
