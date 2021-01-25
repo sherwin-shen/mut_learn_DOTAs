@@ -3,8 +3,8 @@ import random
 import copy
 import queue
 import math
-from common.TimedWord import TimedWord
-
+from common.TimedWord import TimedWord, Test
+from common.hypothesis import MutationState
 
 # 随机测试算法1 - 完全随机采样
 def random_testing_1(hypothesis, upper_guard, state_num, system):
@@ -78,7 +78,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
                     break
     while True:
         rS = random.choice(hypothesis.states)
-        p0, now_time = find_path(hypothesis, upper_guard, now_time, state, rS)
+        p0, now_time = find_path_old(hypothesis, upper_guard, now_time, state, rS)
         if p0:
             li = random.randint(1, linfix)
             rSteps_i = []
@@ -193,24 +193,28 @@ def random_testing_4(hypothesis, upper_guard, state_num, pre_ctx, system):
 
 # 测试集生成方法
 def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx):
-    test = []
+    test = Test([], 0)
     hypothesis = copy.deepcopy(hypothesis)
     # 将迁移按照状态/有效性进行分组
     invalid_tran_dict = {}
     valid_tran_dict = {}
     tran_dict = {}
     non_passed_state = []
+    mutation_state = []
     for state in hypothesis.states:
         invalid_tran_dict[state] = []
         valid_tran_dict[state] = []
         tran_dict[state] = []
         non_passed_state.append(state)
+        mutation_state.append(MutationState(state, 0))
+
     for tran in hypothesis.trans:
         if tran.source == hypothesis.sink_state or tran.target == hypothesis.sink_state:
             invalid_tran_dict[tran.source].append(tran)
         else:
             valid_tran_dict[tran.source].append(tran)
         tran_dict[tran.source].append(tran)
+        mutation_state[tran.target].in_degree += 1
 
     # 开始
     now_time = 0
@@ -228,19 +232,22 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                     else:
                         now_time = 0
                     break
+            test.weight += mutation_state[state].in_degree
             if state in non_passed_state:
                 non_passed_state.remove(state)
-        test = test + pre_ctx
+        test.time_words.extend(pre_ctx)
+        #test = test + pre_ctx
     # 随机游走
-    while len(test) < max_steps:
+    while len(test.time_words) < max_steps:
         if coin_flip(pvalid):
             if valid_tran_dict[state]:
                 next_tran = random.choice(valid_tran_dict[state])
                 delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
                 if delay_time is None:
                     continue
-                test.append(TimedWord(next_tran.action, delay_time))
+                test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
+                test.weight += mutation_state[state].in_degree
                 if next_tran.reset:
                     now_time = 0
                 else:
@@ -253,8 +260,9 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                 delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
                 if delay_time is None:
                     continue
-                test.append(TimedWord(next_tran.action, delay_time))
+                test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
+                test.weight += mutation_state[state].in_degree
                 if next_tran.reset:
                     now_time = 0
                 else:
@@ -268,9 +276,12 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
     # 选择新的状态并找到路径
     if non_passed_state:
         target_state = random.choice(non_passed_state)
-        path_dtw = find_path(hypothesis, upper_guard, now_time, state, target_state, tran_dict)
+        path_dtw, path_weight = find_path(hypothesis, upper_guard, now_time, state, target_state, tran_dict, mutation_state)
         if path_dtw:
-            test.extend(path_dtw)
+            test.time_words.extend(path_dtw)
+            test.weight += path_weight
+    test.length = len(test.time_words)
+    test.weight = test.weight / test.length
     return test
 
 
@@ -306,18 +317,18 @@ def prefixes(tws):
 
 
 # find a path from s1 to s2
-def find_path(hypothesis, upper_guard, now_time, s1, s2, tran_dict):
+def find_path(hypothesis, upper_guard, now_time, s1, s2, tran_dict, mutation_state):
     if s1 == hypothesis.sink_state and s2 != hypothesis.sink_state:
-        return []
+        return [], 0
 
     init_now_time = now_time
     visited = []
     next_to_explore = queue.Queue()
-    next_to_explore.put([s1, init_now_time, []])
+    next_to_explore.put([s1, init_now_time, [], 0])
     for state in hypothesis.states:
         random.shuffle(tran_dict[state])
     while not next_to_explore.empty():
-        [sc, n_time, paths] = next_to_explore.get()
+        [sc, n_time, paths, path_weight] = next_to_explore.get()
         if paths is None:
             paths = []
         if sc not in visited:
@@ -334,9 +345,10 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2, tran_dict):
                     n_time += delay_time
                 if sn == s2:
                     paths.append(temp_DTW)
-                    return paths
-                next_to_explore.put([sn, n_time, copy.deepcopy(paths).append(temp_DTW)])
-    return []
+                    return paths, path_weight
+                path_weight += mutation_state[sn].in_degree
+                next_to_explore.put([sn, n_time, copy.deepcopy(paths).append(temp_DTW), path_weight])
+    return [], 0
 
 
 # find a path from s1 to s2

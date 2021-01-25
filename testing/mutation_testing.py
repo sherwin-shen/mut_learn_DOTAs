@@ -114,6 +114,7 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
+        #Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -159,7 +160,7 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict):
     now_time = 0
     now_state = hypothesis.init_state
     test_result = []
-    for t in test:
+    for t in test.time_words:
         temp_time = t.time + now_time
         new_LTW = TimedWord(t.action, temp_time)
         for tran in hyp_tran_dict[now_state]:
@@ -177,10 +178,10 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict):
                     test_result.append(0)
 
     def tree_create(state, preTime, test_index, mut_tran):
-        if test_index >= len(test):
+        if test_index >= len(test.time_words):
             return True
-        cur_time = test[test_index].time + preTime
-        cur_LTW = TimedWord(test[test_index].action, cur_time)
+        cur_time = test.time_words[test_index].time + preTime
+        cur_LTW = TimedWord(test.time_words[test_index].action, cur_time)
 
         if mut_tran:
             if state == mut_tran.source and mut_tran.is_passing_tran(cur_LTW):
@@ -262,6 +263,7 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
+        #Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -322,10 +324,10 @@ def state_mutation_analysis(muts_NFA, test, C, tran_dict):
     C_test = []
 
     def tree_create(state, preTime, test_index):
-        if test_index >= len(test):
+        if test_index >= len(test.time_words):
             return True
-        cur_time = test[test_index].time + preTime
-        new_LTW = TimedWord(test[test_index].action, cur_time)
+        cur_time = test.time_words[test_index].time + preTime
+        new_LTW = TimedWord(test.time_words[test_index].action, cur_time)
         if state not in tran_dict.keys():
             return True
         cur_trans = tran_dict[state]
@@ -350,6 +352,38 @@ def state_mutation_analysis(muts_NFA, test, C, tran_dict):
 
 
 # 测试筛选
+def test_selection_new(Tests, C, C_tests):
+    Tsel = []
+    Cover_test = {}
+    tests = deepcopy(Tests)
+    cset = deepcopy(C_tests)
+
+    for mut in C:
+        Cover_test[mut] = []
+        for i in range(len(tests)):
+            if mut in cset[i]:
+                Cover_test[mut].append((i, tests[i], tests[i].weight)) #能够覆盖当前mutation的test的index
+        #Cover_test[mut].sort(reverse=True)
+        Cover_test[mut]=sorted(Cover_test[mut], key=lambda x: x[2], reverse=True)
+    #print(Cover_test)
+    Cover_test_sort = sorted(Cover_test.items(), key=lambda d: d[1])
+    #print(Cover_test_sort)
+
+    for ctest in Cover_test_sort:
+        #print(Cover_test[ctest[0]])
+        if not Cover_test.get(ctest[0]):
+            continue
+        for test in Cover_test[ctest[0]]:
+            if test[1] not in Tsel:
+                Tsel.append(test[1])
+                break
+        for mut in cset[int(test[0])]:
+            if not Cover_test.get(mut):
+                continue
+            del(Cover_test[mut])
+    return Tsel
+
+
 def test_selection(Tests, C, C_tests):
     Tsel = []
     c = deepcopy(C)  # all mutations
@@ -377,11 +411,11 @@ def test_execution(hypothesis, system, tests):
     flag = True
     ctx = []
     for test in tests:
-        DRTWs, value = hypothesis.test_DTWs(test)
-        realDRTWs, realValue = system.test_DTWs(test)
+        DRTWs, value = hypothesis.test_DTWs(test.time_words)
+        realDRTWs, realValue = system.test_DTWs(test.time_words)
         if realValue != value:
             flag = False
-            ctx = test
+            ctx = test.time_words
             return flag, ctx
     return flag, ctx
 

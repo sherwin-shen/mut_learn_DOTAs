@@ -84,3 +84,10 @@ def LRTW_to_DRTW(lrtws):
         else:
             now_time = lrtw.time
     return drtws
+
+
+class Test(object):
+    def __init__(self, time_words, weight):
+        self.time_words = time_words
+        self.length = len(time_words)
+        self.weight = weight

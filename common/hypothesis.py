@@ -113,6 +113,11 @@ class DiscreteOTATran(object):
         self.target = target
 
 
+class MutationState(object):
+    def __init__(self, state_id, in_degree):
+        self.state_id = state_id
+        self.in_degree = in_degree
+
 class OTATran(object):
     def __init__(self, tran_id, source, action, guards, reset, target):
         self.tran_id = tran_id
