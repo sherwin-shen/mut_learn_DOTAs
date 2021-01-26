@@ -1,7 +1,8 @@
 import random
+import math
 from copy import deepcopy
 from common.TimedWord import TimedWord
-from common.hypothesis import OTATran
+from common.hypothesis import OTATran, MutationState
 from common.TimeInterval import guard_split
 from testing.random_testing import test_generation_4
 
@@ -29,6 +30,13 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
 
+    State = []
+    state_time = 0
+    for state in hypothesisOTA.states:
+        State.append(MutationState(state, 0))
+    for tran in hypothesisOTA.trans:
+        State[tran.target].in_degree += 1
+
     # 参数配置 - 变异相关
     duration = system.get_minimal_duration()  # It can also be set by the user.
     if duration < 1:
@@ -39,12 +47,16 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     # 测试集生成
     tests = []
     for i in range(test_num):
-        tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx))
+        test, State = test_generation_4(hypothesisOTA, pstart, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx, State)
+        tests.append(test)
+        state_time += len(test.time_words)+1
+    for state in hypothesisOTA.states:
+        State[state].reach_rate = State[state].reach_time/state_time
 
     tested = []  # 缓存已测试序列
 
     # step1: timed变异
-    timed_tests = mutation_timed(hypothesisOTA, duration, upper_guard, tests)
+    timed_tests = mutation_timed(hypothesisOTA, duration, upper_guard, tests, State)
     if len(timed_tests) > 0:
         print('number of timed tests', len(timed_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
@@ -52,7 +64,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
        
     # step2: 如果未找到反例, state变异    
     if equivalent:
-        state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, tests)
+        state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, tests, State)
         if len(state_tests) > 0:
             state_tests = remove_tested(state_tests, tested)
             print('number of state tests', len(state_tests))
@@ -89,7 +101,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
 
 
 # timed mutation
-def mutation_timed(hypothesis, duration, upper_guard, tests):
+def mutation_timed(hypothesis, duration, upper_guard, tests, State):
     Tsel = []
     # 生成变异体
     mutants = timed_mutation_generation(hypothesis, duration, upper_guard)  # 这里的mutants是trans信息
@@ -104,7 +116,7 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
     C = []
     C_tests = []
     for test in tests:
-        C_test, C = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict)
+        C_test, C ,test = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State)
         if C_test:
             tests_valid.append(test)
             C_tests.append(C_test)
@@ -113,8 +125,8 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
         print("timed mutation coverage:", coverage)
     # 测试筛选
     if C_tests:
-        Tsel = test_selection(tests_valid, C, C_tests)
-        #Tsel = test_selection_new(tests_valid, C, C_tests)
+        #Tsel = test_selection(tests_valid, C, C_tests)
+        Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -152,7 +164,7 @@ def timed_NFA_generation(mutants, hypothesis):
 
 
 # timed 变异分析
-def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict):
+def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State):
     C_test = []
 
     # 获取test在hypothesis里的结果，用于与muts区分
@@ -234,11 +246,17 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict):
                 tree_create(cur_tran.target, tempTime, test_index + 1, mut_tran)
 
     tree_create(muts_NFA.init_state, 0, 0, None)
-    return C_test, C
+    test.pass_mut_num = len(C_test)
+    state_weight = 0
+    for s in test.pass_states:
+        state_weight += State[s].reach_rate
+    test.weight = test.pass_mut_num / (state_weight * test.length)
+    #print(test.pass_mut_num, state_weight, test.length, test.weight)
+    return C_test, C, test
 
 
 # split_state mutation
-def mutation_state(hypothesis, state_num, nacc, k, tests):
+def mutation_state(hypothesis, state_num, nacc, k, tests, State):
     Tsel = []
     # 生成变异体
     mutants = split_state_mutation_generation(hypothesis, nacc, k, state_num)
@@ -253,7 +271,7 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
     C = []
     C_tests = []
     for test in tests:
-        C_test, C = state_mutation_analysis(muts_NFA, test, C, tran_dict)
+        C_test, C, test = state_mutation_analysis(muts_NFA, test, C, tran_dict, State)
         if C_test:
             tests_valid.append(test)
             C_tests.append(C_test)
@@ -262,8 +280,8 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
         print("state mutation coverage:", coverage)
     # 测试筛选
     if C_tests:
-        Tsel = test_selection(tests_valid, C, C_tests)
-        #Tsel = test_selection_new(tests_valid, C, C_tests)
+        #Tsel = test_selection(tests_valid, C, C_tests)
+        Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -320,7 +338,7 @@ def state_NFA_generation(mutations, hypothesis):
 
 
 # state 变异分析
-def state_mutation_analysis(muts_NFA, test, C, tran_dict):
+def state_mutation_analysis(muts_NFA, test, C, tran_dict, State):
     C_test = []
 
     def tree_create(state, preTime, test_index):
@@ -348,7 +366,13 @@ def state_mutation_analysis(muts_NFA, test, C, tran_dict):
                 tree_create(tran.target, tempTime, test_index + 1)
 
     tree_create(muts_NFA.init_state, 0, 0)
-    return C_test, C
+    test.pass_mut_num = len(C_test)
+    state_weight = 0
+    for s in test.pass_states:
+        state_weight += State[s].reach_rate
+    test.weight = test.pass_mut_num / (state_weight * test.length)
+    #print(test.pass_mut_num, state_weight, test.length, test.weight)
+    return C_test, C, test
 
 
 # 测试筛选

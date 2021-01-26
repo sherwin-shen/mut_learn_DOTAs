@@ -117,6 +117,8 @@ class MutationState(object):
     def __init__(self, state_id, in_degree):
         self.state_id = state_id
         self.in_degree = in_degree
+        self.reach_time = 0
+        self.reach_rate = 0.0
 
 class OTATran(object):
     def __init__(self, tran_id, source, action, guards, reset, target):
