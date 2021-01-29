@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     for mark_name in pathh:
     #for k in range(8):
-        for j in range(1):#每个模型跑j遍
+        for j in range(5):#每个模型跑j遍
             for i in range(1):
                 ### file directory
                 # model_file = sys.argv[1]
@@ -99,7 +99,7 @@ if __name__ == '__main__':
                 temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
                 #result_path = 'results/' + teacher_type + '/' + 'random' + '/' + temp_path
                 #result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
-                result_path = 'results/' + teacher_type + '/' + 'temp_test' + '/' + temp_path
+                result_path = 'results/' + teacher_type + '/' + 'select_optimization' + '/' + temp_path
 
                 # debug mode
                 debug_flag = False

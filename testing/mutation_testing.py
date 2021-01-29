@@ -51,7 +51,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
         tests.append(test)
         state_time += len(test.time_words)+1
     for state in hypothesisOTA.states:
-        State[state].reach_rate = State[state].reach_time/state_time
+        State[state].reach_rate = 1 - State[state].reach_time/state_time
 
     tested = []  # 缓存已测试序列
 
@@ -116,7 +116,7 @@ def mutation_timed(hypothesis, duration, upper_guard, tests, State):
     C = []
     C_tests = []
     for test in tests:
-        C_test, C ,test = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State)
+        C_test, C ,test = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State, len(mutants))
         if C_test:
             tests_valid.append(test)
             C_tests.append(C_test)
@@ -164,7 +164,7 @@ def timed_NFA_generation(mutants, hypothesis):
 
 
 # timed 变异分析
-def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State):
+def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State, mut_num):
     C_test = []
 
     # 获取test在hypothesis里的结果，用于与muts区分
@@ -246,11 +246,13 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State):
                 tree_create(cur_tran.target, tempTime, test_index + 1, mut_tran)
 
     tree_create(muts_NFA.init_state, 0, 0, None)
-    test.pass_mut_num = len(C_test)
+    test.pass_mut_num = len(C_test) / mut_num
     state_weight = 0
     for s in test.pass_states:
-        state_weight += State[s].reach_rate
-    test.weight = test.pass_mut_num / (state_weight * test.length)
+        state_weight += State[s].reach_rate * 0.1
+    #test.weight = test.pass_mut_num / (state_weight * test.length)
+    #test.weight = 10 / (state_weight * test.length)
+    test.weight = test.pass_mut_num*0 + state_weight * 0.8 + test.length * 0.2
     #print(test.pass_mut_num, state_weight, test.length, test.weight)
     return C_test, C, test
 
@@ -271,7 +273,7 @@ def mutation_state(hypothesis, state_num, nacc, k, tests, State):
     C = []
     C_tests = []
     for test in tests:
-        C_test, C, test = state_mutation_analysis(muts_NFA, test, C, tran_dict, State)
+        C_test, C, test = state_mutation_analysis(muts_NFA, test, C, tran_dict, State, len(mutants))
         if C_test:
             tests_valid.append(test)
             C_tests.append(C_test)
@@ -338,7 +340,7 @@ def state_NFA_generation(mutations, hypothesis):
 
 
 # state 变异分析
-def state_mutation_analysis(muts_NFA, test, C, tran_dict, State):
+def state_mutation_analysis(muts_NFA, test, C, tran_dict, State, mut_num):
     C_test = []
 
     def tree_create(state, preTime, test_index):
@@ -366,11 +368,13 @@ def state_mutation_analysis(muts_NFA, test, C, tran_dict, State):
                 tree_create(tran.target, tempTime, test_index + 1)
 
     tree_create(muts_NFA.init_state, 0, 0)
-    test.pass_mut_num = len(C_test)
+    test.pass_mut_num = len(C_test) / mut_num * 0.1
     state_weight = 0
     for s in test.pass_states:
-        state_weight += State[s].reach_rate
-    test.weight = test.pass_mut_num / (state_weight * test.length)
+        state_weight += State[s].reach_rate * 0.1
+    #test.weight = test.pass_mut_num / (state_weight * test.length)
+    #test.weight = 10 / (state_weight * test.length)
+    test.weight = test.pass_mut_num*0 + state_weight * 0.8 + test.length * 0.2
     #print(test.pass_mut_num, state_weight, test.length, test.weight)
     return C_test, C, test
 
@@ -388,13 +392,15 @@ def test_selection_new(Tests, C, C_tests):
             if mut in cset[i]:
                 Cover_test[mut].append((i, tests[i], tests[i].weight)) #能够覆盖当前mutation的test的index
         #Cover_test[mut].sort(reverse=True)
-        Cover_test[mut]=sorted(Cover_test[mut], key=lambda x: x[2], reverse=True)
+        Cover_test[mut] = sorted(Cover_test[mut], key=lambda x: x[2], reverse=True)
+        Cover_test[mut].append(len(Cover_test[mut]))
+        #print(Cover_test[mut])
     #print(Cover_test)
-    Cover_test_sort = sorted(Cover_test.items(), key=lambda d: d[1])
+    Cover_test_sort = sorted(Cover_test.items(), key=lambda d: d[1][-1])
     #print(Cover_test_sort)
 
     for ctest in Cover_test_sort:
-        #print(Cover_test[ctest[0]])
+        #print(ctest)
         if not Cover_test.get(ctest[0]):
             continue
         for test in Cover_test[ctest[0]]:
