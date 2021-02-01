@@ -291,9 +291,10 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
             for state in path_state:
                 mutation_state[state].reach_time += 1
             #test.weight += path_weight
-    test.length = 1 - (len(test.time_words) - 1)/ max_steps
-    if test.length <= 0.1:
-        test.length + 0.1
+    #test.length = 1 - (len(test.time_words) - 1)/ max_steps
+    test.length = len(test.time_words)
+    #if test.length <= 0.1:
+    #    test.length + 0.1
     #test.weight = test.weight / test.length
     return test, mutation_state
 

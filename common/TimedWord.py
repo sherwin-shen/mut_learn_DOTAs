@@ -92,4 +92,6 @@ class Test(object):
         self.pass_states = []
         self.length = len(time_words)
         self.weight = weight
-        self.pass_mut_num = 0
+        self.mut_weight = 0
+        self.state_weight = 0
+        self.len_weight = 0

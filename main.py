@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     for mark_name in pathh:
     #for k in range(8):
-        for j in range(5):#每个模型跑j遍
+        for j in range(10):#每个模型跑j遍
             for i in range(1):
                 ### file directory
                 # model_file = sys.argv[1]
