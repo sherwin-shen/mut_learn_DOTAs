@@ -116,10 +116,10 @@ def mutation_timed(hypothesis, duration, upper_guard, tests, State):
     C = []
     C_tests = []
     max_mutWeight = 0
-    max_stateWeight = 0
+    #max_stateWeight = 0
     max_lenWeight = 0
     min_mutWeight = float('inf')
-    min_stateWeight = float('inf')
+    #min_stateWeight = float('inf')
     min_lenWeight = float('inf')
     for test in tests:
         C_test, C, test = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State, len(mutants))
@@ -129,14 +129,14 @@ def mutation_timed(hypothesis, duration, upper_guard, tests, State):
 
             if len(C_test) > max_mutWeight:
                 max_mutWeight = len(C_test)
-            if test.state_weight > max_stateWeight:
-                max_stateWeight = test.state_weight
+            #if test.state_weight > max_stateWeight:
+            #    max_stateWeight = test.state_weight
             if test.length > max_lenWeight:
                 max_lenWeight = test.length
             if len(C_test) < min_mutWeight:
                 min_mutWeight = len(C_test)
-            if test.state_weight < min_stateWeight:
-                min_stateWeight = test.state_weight
+            #if test.state_weight < min_stateWeight:
+            #    min_stateWeight = test.state_weight
             if test.length < min_lenWeight:
                 min_lenWeight = test.length
     if C:
@@ -144,11 +144,11 @@ def mutation_timed(hypothesis, duration, upper_guard, tests, State):
         print("timed mutation coverage:", coverage)
 
     #test属性归一化
-    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_stateWeight, max_lenWeight, min_mutWeight, min_stateWeight, min_lenWeight)
+    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_lenWeight, min_mutWeight, min_lenWeight)
     # 测试筛选
     if C_tests:
-        Tsel = test_selection(tests_valid, C, C_tests)
-        #Tsel = test_selection_new(tests_valid, C, C_tests)
+        #Tsel = test_selection(tests_valid, C, C_tests)
+        Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -270,8 +270,8 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State, mut
     tree_create(muts_NFA.init_state, 0, 0, None)
     #test.mut_weight = len(C_test) / mut_num
     #state_weight = 0
-    for s in test.pass_states:
-        test.state_weight += State[s].reach_rate
+    #for s in test.pass_states:
+    #    test.state_weight += State[s].reach_rate
     #test.weight = test.pass_mut_num / (state_weight * test.length)
     #test.weight = 10 / (state_weight * test.length)
     #test.weight = test.mut_weight*0.0 + test.state_weight * 1 + test.len_weight * 0.0
@@ -296,10 +296,10 @@ def mutation_state(hypothesis, state_num, nacc, k, tests, State):
     C_tests = []
 
     max_mutWeight = 0
-    max_stateWeight = 0
+    #max_stateWeight = 0
     max_lenWeight = 0
     min_mutWeight = float('inf')
-    min_stateWeight = float('inf')
+    #min_stateWeight = float('inf')
     min_lenWeight = float('inf')
     for test in tests:
         C_test, C, test = state_mutation_analysis(muts_NFA, test, C, tran_dict, State, len(mutants))
@@ -309,14 +309,14 @@ def mutation_state(hypothesis, state_num, nacc, k, tests, State):
 
             if len(C_test) > max_mutWeight:
                 max_mutWeight = len(C_test)
-            if test.state_weight > max_stateWeight:
-                max_stateWeight = test.state_weight
+            #if test.state_weight > max_stateWeight:
+            #    max_stateWeight = test.state_weight
             if test.length > max_lenWeight:
                 max_lenWeight = test.length
             if len(C_test) < min_mutWeight:
                 min_mutWeight = len(C_test)
-            if test.state_weight < min_stateWeight:
-                min_stateWeight = test.state_weight
+            #if test.state_weight < min_stateWeight:
+            #    min_stateWeight = test.state_weight
             if test.length < min_lenWeight:
                 min_lenWeight = test.length
     if C:
@@ -324,13 +324,12 @@ def mutation_state(hypothesis, state_num, nacc, k, tests, State):
         print("timed mutation coverage:", coverage)
 
     # test属性归一化
-    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_stateWeight, max_lenWeight, min_mutWeight,
-                               min_stateWeight, min_lenWeight)
+    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_lenWeight, min_mutWeight, min_lenWeight)
 
     # 测试筛选
     if C_tests:
-        Tsel = test_selection(tests_valid, C, C_tests)
-        #Tsel = test_selection_new(tests_valid, C, C_tests)
+        #Tsel = test_selection(tests_valid, C, C_tests)
+        Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -417,8 +416,8 @@ def state_mutation_analysis(muts_NFA, test, C, tran_dict, State, mut_num):
     #tree_create(muts_NFA.init_state, 0, 0)
     #test.pass_mut_num = len(C_test) / mut_num * 0.1
     #state_weight = 0
-    for s in test.pass_states:
-        test.state_weight += State[s].reach_rate
+    #for s in test.pass_states:
+    #    test.state_weight += State[s].reach_rate
     #test.weight = test.pass_mut_num / (state_weight * test.length)
     #test.weight = 10 / (state_weight * test.length)
     #test.weight = test.pass_mut_num*0.0 + state_weight * 1 + test.length * 0.0
@@ -610,10 +609,10 @@ def k_step_trans(hypothesis, q, k):
     recursion(q, [])
     return trans_list
 
-def rerange_test(tests_valid, C_tests, max_mutWeight, max_stateWeight, max_lenWeight, min_mutWeight, min_stateWeight, min_lenWeight):
+def rerange_test(tests_valid, C_tests, max_mutWeight, max_lenWeight, min_mutWeight, min_lenWeight):
     index = 0
     mut_range = max_mutWeight - min_mutWeight
-    state_range = max_stateWeight - min_stateWeight
+    #state_range = max_stateWeight - min_stateWeight
     len_range = max_lenWeight - min_lenWeight
     for test in tests_valid:
         if mut_range == 0:
@@ -621,8 +620,8 @@ def rerange_test(tests_valid, C_tests, max_mutWeight, max_stateWeight, max_lenWe
         else:
             test.mut_weight = (len(C_tests[index])-min_mutWeight)/mut_range
         #print(len(C_tests[index]), test.state_weight, test.length, test.weight)
-        test.state_weight = 1 - (test.state_weight - min_stateWeight)/state_range
+        #test.state_weight = 1 - (test.state_weight - min_stateWeight)/state_range
         test.len_weight = 1 - (test.length - min_lenWeight)/len_range
-        test.weight = 0.1 * test.mut_weight + 0.6 * test.state_weight + 0.3 * test.len_weight
+        test.weight = 0.2 * test.mut_weight + 0.8 * test.len_weight
         #print(test.mut_weight, test.state_weight, test.len_weight, test.weight)
     return tests_valid

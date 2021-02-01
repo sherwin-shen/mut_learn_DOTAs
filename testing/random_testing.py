@@ -219,8 +219,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
     # 开始
     now_time = 0
     state = hypothesis.init_state
-    mutation_state[state].reach_time += 1
-    test.pass_states.append(state)
+    #mutation_state[state].reach_time += 1
+    #test.pass_states.append(state)
     non_passed_state.remove(state)
     # 是否从前一反例出发
     if coin_flip(p_start) and len(pre_ctx) < max_steps:
@@ -235,8 +235,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                         now_time = 0
                     break
             #test.weight += mutation_state[state].in_degree
-            mutation_state[state].reach_time += 1
-            test.pass_states.append(state)
+            #mutation_state[state].reach_time += 1
+            #test.pass_states.append(state)
             if state in non_passed_state:
                 non_passed_state.remove(state)
         test.time_words.extend(pre_ctx)
@@ -252,8 +252,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                 test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
                 #test.weight += mutation_state[state].in_degree
-                mutation_state[state].reach_time += 1
-                test.pass_states.append(state)
+                #mutation_state[state].reach_time += 1
+                #test.pass_states.append(state)
                 if next_tran.reset:
                     now_time = 0
                 else:
@@ -269,8 +269,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                 test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
                 #test.weight += mutation_state[state].in_degree
-                mutation_state[state].reach_time += 1
-                test.pass_states.append(state)
+                #mutation_state[state].reach_time += 1
+                #test.pass_states.append(state)
                 if next_tran.reset:
                     now_time = 0
                 else:
@@ -284,12 +284,12 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
     # 选择新的状态并找到路径
     if non_passed_state:
         target_state = random.choice(non_passed_state)
-        path_dtw, path_state = find_path(hypothesis, upper_guard, now_time, state, target_state, tran_dict)
-        if path_dtw and path_state:
+        path_dtw = find_path(hypothesis, upper_guard, now_time, state, target_state, tran_dict)
+        if path_dtw:
             test.time_words.extend(path_dtw)
-            test.pass_states.extend(path_state)
-            for state in path_state:
-                mutation_state[state].reach_time += 1
+            #test.pass_states.extend(path_state)
+            #for state in path_state:
+                #mutation_state[state].reach_time += 1
             #test.weight += path_weight
     #test.length = 1 - (len(test.time_words) - 1)/ max_steps
     test.length = len(test.time_words)
@@ -333,20 +333,20 @@ def prefixes(tws):
 # find a path from s1 to s2
 def find_path(hypothesis, upper_guard, now_time, s1, s2, tran_dict):
     if s1 == hypothesis.sink_state and s2 != hypothesis.sink_state:
-        return [], []
+        return []
 
     init_now_time = now_time
     visited = []
     next_to_explore = queue.Queue()
-    next_to_explore.put([s1, init_now_time, [], [s1], 0])
+    next_to_explore.put([s1, init_now_time, []])
     for state in hypothesis.states:
         random.shuffle(tran_dict[state])
     while not next_to_explore.empty():
-        [sc, n_time, paths, states, path_weight] = next_to_explore.get()
+        [sc, n_time, paths] = next_to_explore.get()
         if paths is None:
             paths = []
-        if states is None:
-            states = []
+        #if states is None:
+        #    states = []
         if sc not in visited:
             visited.append(sc)
             for ts in tran_dict[sc]:
@@ -361,12 +361,12 @@ def find_path(hypothesis, upper_guard, now_time, s1, s2, tran_dict):
                     n_time += delay_time
                 if sn == s2:
                     paths.append(temp_DTW)
-                    states.append(sn)
-                    return paths, states
+                    #states.append(sn)
+                    return paths
                 #path_weight += mutation_state[sn].in_degree
                 #mutation_state[sn].reach_time += 1
-                next_to_explore.put([sn, n_time, copy.deepcopy(paths).append(temp_DTW), copy.deepcopy(states).append(sn), path_weight])
-    return [], []
+                next_to_explore.put([sn, n_time, copy.deepcopy(paths).append(temp_DTW)])
+    return []
 
 
 # find a path from s1 to s2

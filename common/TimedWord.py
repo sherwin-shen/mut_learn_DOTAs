@@ -89,9 +89,9 @@ def LRTW_to_DRTW(lrtws):
 class Test(object):
     def __init__(self, time_words, weight):
         self.time_words = time_words
-        self.pass_states = []
+        #self.pass_states = []
         self.length = len(time_words)
         self.weight = weight
         self.mut_weight = 0
-        self.state_weight = 0
+        #self.state_weight = 0
         self.len_weight = 0
