@@ -158,7 +158,7 @@ class System(object):
                     res = guard.get_min()
                 if guard.get_max() - guard.get_min() < res:
                     res = guard.get_max() - guard.get_min()
-        if res == float('inf'):
+        if res == float('inf') or res == 0:
             res = 1
         return res
 

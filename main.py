@@ -36,7 +36,7 @@ def main():
         print("———————————————————————————————————————————")
         print("Succeed! The result is as follows:")
         # validate
-        make_hypothesis(learned_system, result_path, '/model_hypothesis')
+        # make_hypothesis(learned_system, result_path, '/model_hypothesis')
         correct_flag, passing_rate = validate(learned_system, system)
         print("Total time of learning: " + str(end_time - start_time))
         print("Total number of MQs (no-cache): " + str(mq_num))
