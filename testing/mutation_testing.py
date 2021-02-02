@@ -327,6 +327,40 @@ def state_mutation_analysis(muts_NFA, test, C, tran_dict):
 # 测试筛选
 def test_selection(Tests, C, C_tests):
     Tsel = []
+    Tsel_index = []
+    c = deepcopy(C)  # all mutations
+    tests = deepcopy(Tests)  # tests
+    cset = deepcopy(C_tests)  # tests 对应的 cover mutation set
+    mut_dict = {}
+    for mut_item in c:
+        mut_dict[mut_item] = []
+    for index in range(len(cset)):
+        muts = cset[index]
+        for mut in muts:
+            mut_dict[mut].append(index)
+    test_max_length = 0
+    for test in tests:
+        test_max_length = max(test_max_length, len(test))
+    mut_num = len(c)
+    weights = [0] * len(tests)
+    for test_index in range(len(tests)):
+        weights[test_index] = (len(cset[test_index]) / mut_num) / (len(tests[test_index]) / test_max_length)
+    mut_dict = sorted(mut_dict.items(), key=lambda kv: len(kv[1]))
+    for mut_dict_item in mut_dict:
+        union = list(set(Tsel_index).intersection(set(mut_dict_item[1])))
+        if not union:
+            weight_temp = []
+            for i in mut_dict_item[1]:
+                weight_temp.append(weights[i])
+            max_index = weight_temp.index(max(weight_temp, key=abs))
+            Tsel_index.append(mut_dict_item[1][max_index])
+    for index in Tsel_index:
+        Tsel.append(tests[index])
+    return Tsel
+
+
+def test_selection_old(Tests, C, C_tests):
+    Tsel = []
     c = deepcopy(C)  # all mutations
     tests = deepcopy(Tests)  # tests
     cset = deepcopy(C_tests)  # tests 对应的 cover mutation set
