@@ -78,7 +78,7 @@ if __name__ == '__main__':
     random.seed(3)
 
     # = ["6_2_20", "6_2_50","6_4_10","6_6_10"]
-    pathh = ["4_2_10"]
+    pathh = ["5_2_10"]
 
 
     for mark_name in pathh:

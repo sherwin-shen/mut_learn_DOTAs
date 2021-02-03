@@ -150,7 +150,7 @@ class System(object):
         return res
 
     # Get the minimal region num of a (finite) time guard
-    def get_minimal_duration(self):
+    def get_minimal_duration(self, upper_guard):
         res = float('inf')
         for tran in self.trans:
             for guard in tran.guards:
@@ -158,6 +158,8 @@ class System(object):
                     res = guard.get_min()
                 if guard.get_max() - guard.get_min() < res:
                     res = guard.get_max() - guard.get_min()
+                if guard.get_max() != float('inf') and upper_guard - guard.get_max() < res:
+                    res = upper_guard - guard.get_max()
         if res == float('inf'):
             res = 1
         return res

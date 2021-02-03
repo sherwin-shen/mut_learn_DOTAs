@@ -95,3 +95,4 @@ class Test(object):
         self.mut_weight = 0
         #self.state_weight = 0
         self.len_weight = 0
+        self.tran_weight = 0

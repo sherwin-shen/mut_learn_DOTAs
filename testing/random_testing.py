@@ -192,7 +192,7 @@ def random_testing_4(hypothesis, upper_guard, state_num, pre_ctx, system):
 
 
 # 测试集生成方法
-def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx, mutation_state):
+def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx):
     test = Test([], 0)
     hypothesis = copy.deepcopy(hypothesis)
     # 将迁移按照状态/有效性进行分组
@@ -200,6 +200,7 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
     valid_tran_dict = {}
     tran_dict = {}
     non_passed_state = []
+    passed_tran = []
     #mutation_state = []
     for state in hypothesis.states:
         invalid_tran_dict[state] = []
@@ -233,6 +234,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                         now_time = temp_LTW.time
                     else:
                         now_time = 0
+                    if tran not in passed_tran:
+                        passed_tran.append(tran)
                     break
             #test.weight += mutation_state[state].in_degree
             #mutation_state[state].reach_time += 1
@@ -251,6 +254,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                     continue
                 test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
+                if next_tran not in passed_tran:
+                    passed_tran.append(next_tran)
                 #test.weight += mutation_state[state].in_degree
                 #mutation_state[state].reach_time += 1
                 #test.pass_states.append(state)
@@ -268,6 +273,8 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
                     continue
                 test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
+                if next_tran not in passed_tran:
+                    passed_tran.append(next_tran)
                 #test.weight += mutation_state[state].in_degree
                 #mutation_state[state].reach_time += 1
                 #test.pass_states.append(state)
@@ -287,16 +294,24 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, pnext, max_steps, uppe
         path_dtw = find_path(hypothesis, upper_guard, now_time, state, target_state, tran_dict)
         if path_dtw:
             test.time_words.extend(path_dtw)
+            for p in path_dtw:
+                for tran in tran_dict[state]:
+                    if tran.is_passing_tran(p):
+                        state = tran.target
+                        if next_tran not in passed_tran:
+                            passed_tran.append(next_tran)
+                        break
             #test.pass_states.extend(path_state)
             #for state in path_state:
                 #mutation_state[state].reach_time += 1
             #test.weight += path_weight
     #test.length = 1 - (len(test.time_words) - 1)/ max_steps
     test.length = len(test.time_words)
+    test.tran_weight = len(passed_tran)/test.length
     #if test.length <= 0.1:
     #    test.length + 0.1
     #test.weight = test.weight / test.length
-    return test, mutation_state
+    return test
 
 
 # 测试执行

@@ -30,15 +30,9 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
 
-    State = []
-    state_time = 0
-    for state in hypothesisOTA.states:
-        State.append(MutationState(state, 0))
-    for tran in hypothesisOTA.trans:
-        State[tran.target].in_degree += 1
 
     # 参数配置 - 变异相关
-    duration = system.get_minimal_duration()  # It can also be set by the user.
+    duration = system.get_minimal_duration(upper_guard)  # It can also be set by the user.
     if duration < 1:
         duration = 1
     nacc = 8
@@ -47,16 +41,16 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     # 测试集生成
     tests = []
     for i in range(test_num):
-        test, State = test_generation_4(hypothesisOTA, pstart, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx, State)
+        test = test_generation_4(hypothesisOTA, pstart, pstop, pvalid, pnext, max_steps, upper_guard, pre_ctx)
         tests.append(test)
-        state_time += len(test.time_words)+1
-    for state in hypothesisOTA.states:
-        State[state].reach_rate = 1 - State[state].reach_time/state_time
+        #state_time += len(test.time_words)+1
+    #for state in hypothesisOTA.states:
+    #    State[state].reach_rate = 1 - State[state].reach_time/state_time
 
     tested = []  # 缓存已测试序列
 
     # step1: timed变异
-    timed_tests = mutation_timed(hypothesisOTA, duration, upper_guard, tests, State)
+    timed_tests = mutation_timed(hypothesisOTA, duration, upper_guard, tests)
     if len(timed_tests) > 0:
         print('number of timed tests', len(timed_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
@@ -64,7 +58,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
        
     # step2: 如果未找到反例, state变异    
     if equivalent:
-        state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, tests, State)
+        state_tests = mutation_state(hypothesisOTA, state_num, nacc, k, tests)
         if len(state_tests) > 0:
             state_tests = remove_tested(state_tests, tested)
             print('number of state tests', len(state_tests))
@@ -101,7 +95,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
 
 
 # timed mutation
-def mutation_timed(hypothesis, duration, upper_guard, tests, State):
+def mutation_timed(hypothesis, duration, upper_guard, tests):
     Tsel = []
     # 生成变异体
     mutants = timed_mutation_generation(hypothesis, duration, upper_guard)  # 这里的mutants是trans信息
@@ -116,39 +110,44 @@ def mutation_timed(hypothesis, duration, upper_guard, tests, State):
     C = []
     C_tests = []
     max_mutWeight = 0
-    #max_stateWeight = 0
+    max_tranWeight = 0
     max_lenWeight = 0
     min_mutWeight = float('inf')
-    #min_stateWeight = float('inf')
+    min_tranWeight = float('inf')
     min_lenWeight = float('inf')
     for test in tests:
-        C_test, C, test = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State, len(mutants))
+        C_test, C, test = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict)
         if C_test:
             tests_valid.append(test)
             C_tests.append(C_test)
 
             if len(C_test) > max_mutWeight:
                 max_mutWeight = len(C_test)
-            #if test.state_weight > max_stateWeight:
-            #    max_stateWeight = test.state_weight
+            if test.tran_weight > max_tranWeight:
+                max_tranWeight = test.tran_weight
             if test.length > max_lenWeight:
                 max_lenWeight = test.length
             if len(C_test) < min_mutWeight:
                 min_mutWeight = len(C_test)
-            #if test.state_weight < min_stateWeight:
-            #    min_stateWeight = test.state_weight
+            if test.tran_weight < min_tranWeight:
+                min_tranWeight = test.tran_weight
             if test.length < min_lenWeight:
                 min_lenWeight = test.length
     if C:
         coverage = float(len(C)) / float(len(mutants))
         print("timed mutation coverage:", coverage)
 
+    print("tests_valid:",len(tests_valid))
     #test属性归一化
-    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_lenWeight, min_mutWeight, min_lenWeight)
+    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_tranWeight, max_lenWeight, min_mutWeight, min_tranWeight, min_lenWeight)
     # 测试筛选
     if C_tests:
-        #Tsel = test_selection(tests_valid, C, C_tests)
-        Tsel = test_selection_new(tests_valid, C, C_tests)
+        if (max_mutWeight == min_mutWeight):
+            Tsel = test_selection(tests_valid, C, C_tests)
+        #    print(max_mutWeight, min_mutWeight)
+        else:
+        #    print("DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD")
+            Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -158,6 +157,7 @@ def timed_mutation_generation(hypothesis, duration, upper_guard):
     mut_num = 0
     for tran in hypothesis.trans:
         if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
+        #if tran.source == hypothesis.sink_state:
             continue
         trans = split_tran_guard(tran, duration, upper_guard)
         for state in hypothesis.states:
@@ -174,6 +174,14 @@ def timed_mutation_generation(hypothesis, duration, upper_guard):
                 temp.tran_id = 'tran' + str(mut_num)
                 mut_num += 1
                 mutations.append(temp)
+
+        for prefix in trans:
+            temp = deepcopy(prefix)
+            temp.target = hypothesis.sink_state
+            temp.tran_id = 'tran' + str(mut_num)
+            mut_num += 1
+            mutations.append(temp)
+
     return mutations
 
 
@@ -186,7 +194,7 @@ def timed_NFA_generation(mutants, hypothesis):
 
 
 # timed 变异分析
-def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State, mut_num):
+def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict):
     C_test = []
 
     # 获取test在hypothesis里的结果，用于与muts区分
@@ -280,7 +288,7 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict, State, mut
 
 
 # split_state mutation
-def mutation_state(hypothesis, state_num, nacc, k, tests, State):
+def mutation_state(hypothesis, state_num, nacc, k, tests):
     Tsel = []
     # 生成变异体
     mutants = split_state_mutation_generation(hypothesis, nacc, k, state_num)
@@ -296,40 +304,44 @@ def mutation_state(hypothesis, state_num, nacc, k, tests, State):
     C_tests = []
 
     max_mutWeight = 0
-    #max_stateWeight = 0
+    max_tranWeight = 0
     max_lenWeight = 0
     min_mutWeight = float('inf')
-    #min_stateWeight = float('inf')
+    min_tranWeight = float('inf')
     min_lenWeight = float('inf')
     for test in tests:
-        C_test, C, test = state_mutation_analysis(muts_NFA, test, C, tran_dict, State, len(mutants))
+        C_test, C, test = state_mutation_analysis(muts_NFA, test, C, tran_dict)
         if C_test:
             tests_valid.append(test)
             C_tests.append(C_test)
 
             if len(C_test) > max_mutWeight:
                 max_mutWeight = len(C_test)
-            #if test.state_weight > max_stateWeight:
-            #    max_stateWeight = test.state_weight
+            if test.tran_weight > max_tranWeight:
+                max_tranWeight = test.tran_weight
             if test.length > max_lenWeight:
                 max_lenWeight = test.length
             if len(C_test) < min_mutWeight:
                 min_mutWeight = len(C_test)
-            #if test.state_weight < min_stateWeight:
-            #    min_stateWeight = test.state_weight
+            if test.tran_weight < min_tranWeight:
+                min_tranWeight = test.tran_weight
             if test.length < min_lenWeight:
                 min_lenWeight = test.length
     if C:
         coverage = float(len(C)) / float(len(mutants))
         print("timed mutation coverage:", coverage)
 
+    print("tests_valid:", len(tests_valid))
     # test属性归一化
-    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_lenWeight, min_mutWeight, min_lenWeight)
+    tests_valid = rerange_test(tests_valid, C_tests, max_mutWeight, max_tranWeight, max_lenWeight, min_mutWeight, min_tranWeight, min_lenWeight)
 
     # 测试筛选
     if C_tests:
-        #Tsel = test_selection(tests_valid, C, C_tests)
-        Tsel = test_selection_new(tests_valid, C, C_tests)
+        if (max_mutWeight == min_mutWeight):
+        #    print("KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
+            Tsel = test_selection(tests_valid, C, C_tests)
+        else:
+            Tsel = test_selection_new(tests_valid, C, C_tests)
     return Tsel
 
 
@@ -337,8 +349,8 @@ def mutation_state(hypothesis, state_num, nacc, k, tests, State):
 def split_state_mutation_generation(hypothesis, nacc, k, state_num):
     temp_mutations = []
     for state in hypothesis.states:
-        if state == hypothesis.sink_state:
-            continue
+        #if state == hypothesis.sink_state:
+        #    continue
         set_accq = get_all_acc(hypothesis, state, state_num)
         if len(set_accq) < 2:
             continue
@@ -386,7 +398,7 @@ def state_NFA_generation(mutations, hypothesis):
 
 
 # state 变异分析
-def state_mutation_analysis(muts_NFA, test, C, tran_dict, State, mut_num):
+def state_mutation_analysis(muts_NFA, test, C, tran_dict):
     C_test = []
 
     def tree_create(state, preTime, test_index):
@@ -413,7 +425,7 @@ def state_mutation_analysis(muts_NFA, test, C, tran_dict, State, mut_num):
                     continue
                 tree_create(tran.target, tempTime, test_index + 1)
 
-    #tree_create(muts_NFA.init_state, 0, 0)
+    tree_create(muts_NFA.init_state, 0, 0)
     #test.pass_mut_num = len(C_test) / mut_num * 0.1
     #state_weight = 0
     #for s in test.pass_states:
@@ -443,6 +455,7 @@ def test_selection_new(Tests, C, C_tests):
         #print(Cover_test[mut])
     #print(Cover_test)
     Cover_test_sort = sorted(Cover_test.items(), key=lambda d: d[1][-1])
+    #Cover_test_sort = sorted(Cover_test.items(), key=lambda d: len(d[1]))
     #print(Cover_test_sort)
 
     for ctest in Cover_test_sort:
@@ -609,10 +622,10 @@ def k_step_trans(hypothesis, q, k):
     recursion(q, [])
     return trans_list
 
-def rerange_test(tests_valid, C_tests, max_mutWeight, max_lenWeight, min_mutWeight, min_lenWeight):
+def rerange_test(tests_valid, C_tests, max_mutWeight, max_tranWeight, max_lenWeight, min_mutWeight, min_tranWeight, min_lenWeight):
     index = 0
     mut_range = max_mutWeight - min_mutWeight
-    #state_range = max_stateWeight - min_stateWeight
+    tran_range = max_tranWeight - min_tranWeight
     len_range = max_lenWeight - min_lenWeight
     for test in tests_valid:
         if mut_range == 0:
@@ -621,7 +634,16 @@ def rerange_test(tests_valid, C_tests, max_mutWeight, max_lenWeight, min_mutWeig
             test.mut_weight = (len(C_tests[index])-min_mutWeight)/mut_range
         #print(len(C_tests[index]), test.state_weight, test.length, test.weight)
         #test.state_weight = 1 - (test.state_weight - min_stateWeight)/state_range
-        test.len_weight = 1 - (test.length - min_lenWeight)/len_range
-        test.weight = 0.2 * test.mut_weight + 0.8 * test.len_weight
-        #print(test.mut_weight, test.state_weight, test.len_weight, test.weight)
+        if tran_range == 0:
+            test.tran_weight = 0
+        else:
+            test.tran_weight = (test.tran_weight - min_tranWeight)/tran_range
+        if len_range == 0:
+            test.len_weight = 0
+        else:
+            test.len_weight = (max_lenWeight - test.length)/len_range
+        #test.len_weight = 1 - (test.length - min_lenWeight)/len_range
+        test.weight = 0.8 * test.mut_weight + 0.2 * test.tran_weight + 0.0 * test.len_weight
+        #print(mut_range,test.mut_weight, test.tran_weight, test.len_weight, test.weight)
+        index += 1
     return tests_valid
