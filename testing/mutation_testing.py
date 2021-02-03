@@ -29,7 +29,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
 
     # 参数配置 - 变异相关
-    duration = system.get_minimal_duration()  # It can also be set by the user.
+    duration = system.get_minimal_duration(upper_guard)  # It can also be set by the user.
     nacc = 8
     k = 1
 
@@ -358,7 +358,7 @@ def test_selection(Tests, C, C_tests):
             if mut_item in cset[j]:
                 cover_set[mut_item].append((j, tests[j], tests[j].weight))
         cover_set[mut_item] = sorted(cover_set[mut_item], key=lambda x: x[2], reverse=True)
-    cover_set = sorted(cover_set.items(), key=lambda d: d[1][-1])
+    cover_set = sorted(cover_set.items(), key=lambda d: len(d[1]))
 
     for ctest in cover_set:
         union = list(set(Tsel).intersection(ctest[1]))
@@ -390,7 +390,10 @@ def test_selection_old(Tests, C, C_tests):
             pre_set = cur_max
         else:
             break
-    return Tsel
+    test_suite = []
+    for item in Tsel:
+        test_suite.append(item.time_words)
+    return test_suite
 
 
 # 测试执行
