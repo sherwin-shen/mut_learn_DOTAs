@@ -15,7 +15,7 @@ def make_system(data, filePath, fileName):
         tranLabel = " " + str(tran.action) + " " + tran.show_guards() + " " + str(tran.reset)
         dot.edge(str(tran.source), str(tran.target), tranLabel)
     newFilePath = filePath + fileName
-    dot.render(newFilePath, view=True)
+    dot.render(newFilePath, view=False)
 
 
 # 猜想OTA - accept(忽略sink状态)
@@ -37,7 +37,7 @@ def make_hypothesis(data, filePath, fileName):
             tranLabel = " " + str(tran.action) + " " + tran.show_guards() + " " + str(tran.reset)
             dot.edge(str(tran.source), str(tran.target), tranLabel)
     newFilePath = filePath + fileName
-    dot.render(newFilePath, view=True)
+    dot.render(newFilePath, view=False)
 
 
 # 猜想OTA - accept + sink
@@ -57,4 +57,4 @@ def make_full_hypothesis(data, filePath, fileName):
         tranLabel = " " + str(tran.action) + " " + tran.show_guards() + " " + str(tran.reset)
         dot.edge(str(tran.source), str(tran.target), tranLabel)
     newFilePath = filePath + fileName
-    dot.render(newFilePath, view=True)
+    dot.render(newFilePath, view=False)

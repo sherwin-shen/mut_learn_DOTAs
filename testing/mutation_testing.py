@@ -94,6 +94,7 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
+        print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
 
@@ -238,6 +239,7 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
+        print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
 
@@ -335,8 +337,12 @@ def test_selection(Tests, C, C_tests):
     # 获取 mut_num 和 test_len 的最小值和最大值，用于归一化
     max_mutWeight = 0
     max_lenWeight = 0
+    max_tranWeight = 0
+    max_stateWeight = 0
     min_mutWeight = float('inf')
     min_lenWeight = float('inf')
+    min_tranWeight = float('inf')
+    min_stateWeight = float('inf')
     for i in range(len(tests)):
         mut_num = len(cset[i])
         if mut_num > max_mutWeight:
@@ -348,8 +354,16 @@ def test_selection(Tests, C, C_tests):
             max_lenWeight = test_length
         if test_length < min_lenWeight:
             min_lenWeight = test_length
+        if tests[i].tran_weight < min_tranWeight:
+            min_tranWeight = tests[i].tran_weight
+        if tests[i].tran_weight > max_tranWeight:
+            max_tranWeight = tests[i].tran_weight
+        if tests[i].state_weight < min_stateWeight:
+            min_stateWeight = tests[i].state_weight
+        if tests[i].state_weight > max_stateWeight:
+            max_stateWeight = tests[i].state_weight
     # 计算权重并归一化
-    weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight)
+    weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight)
     # 计算变异体对应的测试用例集
     cover_set = {}
     for mut_item in c:
@@ -525,13 +539,17 @@ def k_step_trans(hypothesis, q, k):
 
 
 # 权重函数
-def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight):
+def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight):
     # tests 与 cset(cover mutation set) 一一对应
     a = 0.2
     b = 0.8
+    c = 0.2
+    d = 0.2
 
     mut_range = max_mutWeight - min_mutWeight
     len_range = max_lenWeight - min_lenWeight
+    tran_range = max_tranWeight - min_tranWeight
+    state_range = max_stateWeight - min_stateWeight
     for i in range(len(tests)):
         if mut_range == 0:
             tests[i].mut_weight = 0
@@ -541,4 +559,13 @@ def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeig
             tests[i].len_weight = 0
         else:
             tests[i].len_weight = 1 - (tests[i].length - min_lenWeight) / len_range
-        tests[i].weight = a * tests[i].mut_weight + b * tests[i].len_weight
+        if tran_range == 0:
+            tests[i].tran_weight = 0
+        else:
+            tests[i].tran_weight = (tests[i].tran_weight - min_tranWeight) / tran_range
+        if state_range == 0:
+            tests[i].state_weight = 0
+        else:
+            tests[i].state_weight = (tests[i].state_weight - min_stateWeight) / state_range
+
+        tests[i].weight = a * tests[i].mut_weight + b * tests[i].len_weight + c * tests[i].tran_weight + d * tests[i].state_weight

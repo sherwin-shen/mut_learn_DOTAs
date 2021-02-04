@@ -42,6 +42,8 @@ class TestInfo(object):
         self.weight = 0
         self.mut_weight = 0
         self.len_weight = 0
+        self.tran_weight = 0
+        self.state_weight = 0
 
 
 # DRTWs -> LRTWs

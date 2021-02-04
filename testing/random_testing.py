@@ -210,8 +210,11 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
         tran_dict[tran.source].append(tran)
 
     # 开始
+    tran_coverage = []
+    state_coverage = []
     now_time = 0
     state = hypothesis.init_state
+    state_coverage.append(state)
     non_passed_state = copy.deepcopy(hypothesis.states)
     non_passed_state.remove(state)
     # 是否从前一反例出发
@@ -222,9 +225,13 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
                 if tran.is_passing_tran(temp_LTW):
                     state = tran.target
                     if tran.reset:
-                        now_time = temp_LTW.time
-                    else:
                         now_time = 0
+                    else:
+                        now_time = temp_LTW.time
+                    if state not in state_coverage:
+                        state_coverage.append(state)
+                    if tran not in tran_coverage:
+                        tran_coverage.append(tran)
                     break
             if state in non_passed_state:
                 non_passed_state.remove(state)
@@ -243,6 +250,10 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
                     now_time = 0
                 else:
                     now_time += delay_time
+                if state not in state_coverage:
+                    state_coverage.append(state)
+                if next_tran not in tran_coverage:
+                    tran_coverage.append(next_tran)
             else:
                 continue
         else:
@@ -257,6 +268,10 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
                     now_time = 0
                 else:
                     now_time += delay_time
+                if state not in state_coverage:
+                    state_coverage.append(state)
+                if next_tran not in tran_coverage:
+                    tran_coverage.append(next_tran)
             else:
                 continue
         if state in non_passed_state:
@@ -269,7 +284,23 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
         path_dtw = find_path(hypothesis, upper_guard, now_time, state, target_state, tran_dict)
         if path_dtw:
             test.time_words.extend(path_dtw)
+            for p in path_dtw:
+                temp_LTW = TimedWord(p.action, now_time + p.time)
+                for tran in tran_dict[state]:
+                    if tran.is_passing_tran(temp_LTW):
+                        state = tran.target
+                        if state not in state_coverage:
+                            state_coverage.append(state)
+                        if tran not in tran_coverage:
+                            tran_coverage.append(tran)
+                        if tran.reset:
+                            now_time = 0
+                        else:
+                            now_time = temp_LTW.time
+                        break
     test.length = len(test.time_words)
+    test.tran_weight = len(tran_coverage)
+    test.state_weight = len(state_coverage)
     return test
 
 
