@@ -35,6 +35,17 @@ class ResetTimedWord(object):
         return "(" + self.action + "," + str(self.time) + "," + str(self.reset) + ")"
 
 
+class TestInfo(object):
+    def __init__(self, time_words):
+        self.time_words = time_words
+        self.length = len(time_words)
+        self.weight = 0
+        self.mut_weight = 0
+        self.len_weight = 0
+        self.tran_weight = 0
+        self.state_weight = 0
+
+
 # DRTWs -> LRTWs
 def DRTW_to_LRTW(drtws):
     lrtws = []
@@ -84,15 +95,3 @@ def LRTW_to_DRTW(lrtws):
         else:
             now_time = lrtw.time
     return drtws
-
-
-class Test(object):
-    def __init__(self, time_words, weight):
-        self.time_words = time_words
-        #self.pass_states = []
-        self.length = len(time_words)
-        self.weight = weight
-        self.mut_weight = 0
-        #self.state_weight = 0
-        self.len_weight = 0
-        self.tran_weight = 0

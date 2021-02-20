@@ -77,29 +77,37 @@ if __name__ == '__main__':
     # used to reproduce experimental results
     random.seed(3)
 
-    # = ["6_2_20", "6_2_50","6_4_10","6_6_10"]
-    pathh = ["5_2_10"]
+    #pathh= ["6_2_20", "6_2_50","6_4_10","6_6_10"]
+    #pathh = ["6_2_10", "4_2_10", '8_2_10', '10_2_10']
+    #pathh = ["6_2_10"]  #select 重新跑
+    pathh = ["TCP"]
 
 
     for mark_name in pathh:
     #for k in range(8):
-        for j in range(10):#每个模型跑j遍
-            for i in range(1):
+        for j in range(20):#每个模型跑j遍
+            #for i in range(3):
                 ### file directory
                 # model_file = sys.argv[1]
                 #mark_name = str(k+3) + "_2_10"
                 #model_file = "benchmarks/5_2_10/5_2_10-" + str(i + 1) + ".json"
-                model_file = "benchmarks/" + mark_name + "/" + mark_name + "-" + str(i + 1) + ".json"
+                #model_file = "benchmarks/" + mark_name + "/" + mark_name + "-" + str(i + 1) + ".json"
+                model_file = "benchmarks/" + mark_name + ".json"
 
                 ### teacher type - smart_teacher / normal_teacher
                 # teacher_type = sys.argv[2]
                 teacher_type = "smart_teacher"
 
                 # results file directory
-                temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
+                #temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
+                temp_path = '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
+
+
                 #result_path = 'results/' + teacher_type + '/' + 'random' + '/' + temp_path
-                #result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
-                result_path = 'results/' + teacher_type + '/' + 'select_optimization' + '/' + temp_path
+                #result_path = 'results/' + teacher_type + '/' + 'mutation_g2' + '/' + temp_path
+                #result_path = 'results/' + teacher_type + '/' + 'select_old' + '/' + temp_path
+                #result_path = 'results/' + teacher_type + '/' + 'mutation_time_only' + '/' + temp_path
+                result_path = 'results/' + teacher_type + '/' + 'random_g4' + '/' + temp_path
 
                 # debug mode
                 debug_flag = False

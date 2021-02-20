@@ -1,6 +1,6 @@
 import copy
 from common.TimedWord import TimedWord, LRTW_to_LTW, DRTW_to_LRTW
-from testing.random_testing import random_testing_1, random_testing_2, random_testing_3, random_testing_4
+from testing.random_testing import random_testing_1, random_testing_2, random_testing_3, random_testing_4, get_test_suit4, random_testing_4_1
 from testing.mutation_testing import mutation_testing
 
 
@@ -22,11 +22,15 @@ def EQs(hypothesisOTA, system, pre_ctx):
     # # 测试3 - 随机游走测试
     # equivalent, ctx = random_testing_3(hypothesisOTA, upper_guard, state_num, system)
 
+    # #提前生成测试集
+    Tests = get_test_suit4(hypothesisOTA, upper_guard, state_num, pre_ctx)
+
     # # 测试4 - 改进的随机测试（用于结合mutation testing）
     #equivalent, ctx = random_testing_4(hypothesisOTA, upper_guard, state_num, pre_ctx, system)
+    equivalent, ctx  = random_testing_4_1(hypothesisOTA, system, Tests)
 
     # 测试5 - mutation-based-testing
-    equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system)
+    #equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system, Tests)
 
     if ctx is not None:
         ctx = minimize_counterexample(hypothesisOTA, system, ctx)
