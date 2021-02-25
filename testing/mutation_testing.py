@@ -18,7 +18,7 @@ class NFA(object):
 
 
 # 基于变异的测试主函数
-def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system, tests):
+def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     equivalent = True
     ctx = None
 
@@ -29,19 +29,20 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system, tes
     pretry = 0.9
     linfix = min(math.ceil(len(hypothesisOTA.states) / 2), math.ceil(state_num / 2))
     max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
-    test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
+    test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 30)
 
     # 参数配置 - 变异相关
     duration = system.get_minimal_duration(upper_guard)  # It can also be set by the user.
+    print("duration:",duration)
     nacc = 8
     k = 1
 
     # 测试集生成
-    #tests = []
-    #for i in range(test_num):
-    #    #tests.append(test_generation_1(hypothesisOTA, upper_guard))
-    #    #tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
-    #    tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, max_steps, upper_guard, pre_ctx))
+    tests = []
+    for i in range(test_num):
+        #tests.append(test_generation_1(hypothesisOTA, upper_guard))
+        #tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
+        tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, max_steps, upper_guard, pre_ctx))
 
     tested = []  # 缓存已测试序列
     #step1: timed变异
@@ -105,8 +106,8 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
         print("timed mutation coverage:", coverage)
     # 测试筛选
     if C_tests:
-        #Tsel = test_selection(tests_valid, C, C_tests)
-        Tsel = test_selection_old(tests_valid, C, C_tests)
+        Tsel = test_selection(tests_valid, C, C_tests)
+        #Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
@@ -251,8 +252,8 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
         print("state mutation coverage:", coverage)
     # 测试筛选
     if C_tests:
-        #Tsel = test_selection(tests_valid, C, C_tests)
-        Tsel = test_selection_old(tests_valid, C, C_tests)
+        Tsel = test_selection(tests_valid, C, C_tests)
+        #Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
@@ -559,7 +560,7 @@ def k_step_trans(hypothesis, q, k):
 def weight_function(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight):
     # tests 与 cset(cover mutation set) 一一对应
     a = 0.6
-    b = 0.6
+    b = 0.2
     c = 0.2
     d = 0.2
 

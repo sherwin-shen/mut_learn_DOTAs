@@ -231,7 +231,7 @@ def test_generation_3(hypothesis, n_len, p_valid, p_delay, upper_guard):
 
 # 随机测试算法4 - 改自随机测试算法2
 def random_testing_4(hypothesis, upper_guard, state_num, pre_ctx, system):
-    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 10)
+    test_num = int(len(hypothesis.states) * len(hypothesis.actions) * upper_guard * 30)
     p_start = 0.4
     pstop = 0.05
     pvalid = 0.8

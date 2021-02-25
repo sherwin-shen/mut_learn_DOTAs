@@ -23,14 +23,14 @@ def EQs(hypothesisOTA, system, pre_ctx):
     # equivalent, ctx = random_testing_3(hypothesisOTA, upper_guard, state_num, system)
 
     # #提前生成测试集
-    Tests = get_test_suit4(hypothesisOTA, upper_guard, state_num, pre_ctx)
+    #Tests = get_test_suit4(hypothesisOTA, upper_guard, state_num, pre_ctx)
 
     # # 测试4 - 改进的随机测试（用于结合mutation testing）
     #equivalent, ctx = random_testing_4(hypothesisOTA, upper_guard, state_num, pre_ctx, system)
-    equivalent, ctx  = random_testing_4_1(hypothesisOTA, system, Tests)
+    #equivalent, ctx = random_testing_4_1(hypothesisOTA, system, Tests)
 
     # 测试5 - mutation-based-testing
-    #equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system, Tests)
+    equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system)
 
     if ctx is not None:
         ctx = minimize_counterexample(hypothesisOTA, system, ctx)

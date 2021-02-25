@@ -161,6 +161,8 @@ class System(object):
                 if guard.get_max() != float('inf') and upper_guard - guard.get_max() < res:
                     res = upper_guard - guard.get_max()
         if res == float('inf'):
+            res = int(upper_guard/2)
+        if res < 1:
             res = 1
         return res
 
