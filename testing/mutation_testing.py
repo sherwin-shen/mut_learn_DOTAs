@@ -1,9 +1,10 @@
 import random
+import math
 from copy import deepcopy
 from common.TimedWord import TimedWord
 from common.hypothesis import OTATran
 from common.TimeInterval import guard_split
-from testing.random_testing import test_generation_4
+from testing.random_testing import test_generation_1, test_generation_2, test_generation_4
 
 
 class NFA(object):
@@ -25,8 +26,11 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     pstart = 0.4
     pstop = 0.05
     pvalid = 0.8
-    max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
-    test_num = int(len(hypothesisOTA.states) * len(hypothesisOTA.actions) * upper_guard * 10)
+    pretry = 0.9
+    linfix = math.ceil(state_num / 2)
+    # max_steps = min(int(2 * state_num), int(2 * len(hypothesisOTA.states)))
+    max_steps = int(2 * state_num)
+    test_num = int(state_num * len(hypothesisOTA.actions) * upper_guard * 30)
 
     # 参数配置 - 变异相关
     duration = system.get_minimal_duration(upper_guard)  # It can also be set by the user.
@@ -36,6 +40,8 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     # 测试集生成
     tests = []
     for i in range(test_num):
+        # test = test_generation_1(hypothesisOTA, upper_guard, state_num)
+        # test = test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard)
         tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, max_steps, upper_guard, pre_ctx))
 
     tested = []  # 缓存已测试序列
@@ -94,6 +100,7 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
+        # Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
@@ -239,6 +246,7 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
+        # Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
@@ -541,8 +549,8 @@ def k_step_trans(hypothesis, q, k):
 # 权重函数
 def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight):
     # tests 与 cset(cover mutation set) 一一对应
-    a = 0.2
-    b = 0.8
+    a = 0.6
+    b = 0.6
     c = 0.2
     d = 0.2
 
