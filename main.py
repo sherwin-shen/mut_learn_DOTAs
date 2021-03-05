@@ -8,8 +8,19 @@ from common.make_pic import make_system, make_hypothesis
 from smart_learning.learnOTA import learnOTA_smart
 from common.validate import validate
 
+import multiprocessing
 
-def main():
+
+def main(params):
+    debug_flag = False
+    path = params[2]
+    i = params[0]
+    j = params[1]
+    model_file = "experiments/" + path + "/" + path + "-" + str(i + 1) + ".json"
+    teacher_type = "smart_teacher"
+    temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
+    result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
+
     # get model information and build target system
     with open(model_file, 'r') as json_model:
         model = json.load(json_model)
@@ -77,56 +88,23 @@ if __name__ == '__main__':
     # used to reproduce experimental results
     random.seed(3)
 
-    # paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_50", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
+    paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_50", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
+
+    teacher_type = "smart_teacher"
 
     for path in paths:
         for i in range(3):
+            model_file = "experiments/" + path + "/" + path + "-" + str(i + 1) + ".json"
+
+            pool = multiprocessing.Pool(multiprocessing.cpu_count() - 2)
+            params = []
             for j in range(15):
-                ### file directory
-                # model_file = sys.argv[1]
-                model_file = "experiments/" + path + "/" + path + "-" + str(i + 1) + ".json"
-
-                ### teacher type - smart_teacher / normal_teacher
-                # teacher_type = sys.argv[2]
-                teacher_type = "smart_teacher"
-
-                # results file directory
-                temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
-
+                params.append((i, j, path))
+            results = pool.map(main, params)
+            pool.close()
+            pool.join()
+            for result in results:
+                temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(result[1] + 1)
                 result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
-                # result_path = 'results/' + teacher_type + '/' + 'random' + '/' + temp_path
-                # result_path = 'results/' + teacher_type + '/' + 'bernhard' + '/' + temp_path
-                # result_path = 'results/' + teacher_type + '/' + 'time_op' + '/' + temp_path
-                # result_path = 'results/' + teacher_type + '/' + 'state_op' + '/' + temp_path
-                # result_path = 'results/' + teacher_type + '/' + 'selection' + '/' + temp_path
-
-                # debug mode
-                debug_flag = False
-
-                ### start running experiment
-                result = main()
-                # save results
                 with open(result_path + "/result.json", 'w') as json_file:
-                    json_file.write(json.dumps(result, indent=2))
-
-    # for i in range(15):
-    #     ### file directory
-    #     # model_file = sys.argv[1]
-    #     model_file = "10_6_15/10_6_15-3.json"
-    #
-    #     ### teacher type - smart_teacher / normal_teacher
-    #     # teacher_type = sys.argv[2]
-    #     teacher_type = "smart_teacher"
-    #
-    #     # results file directory
-    #     temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0]
-    #     result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
-    #
-    #     # debug mode
-    #     debug_flag = False
-    #
-    #     ### start running experiment
-    #     result = main()
-    #     # save results
-    #     with open(result_path + "/result.json", 'w') as json_file:
-    #         json_file.write(json.dumps(result, indent=2))
+                    json_file.write(json.dumps(result[0], indent=2))
