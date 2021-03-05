@@ -6,6 +6,9 @@ from common.hypothesis import OTATran
 from common.TimeInterval import guard_split
 from testing.random_testing import test_generation_1, test_generation_2, test_generation_4
 
+from multiprocessing.dummy import Pool as ThreadPool
+import multiprocessing
+
 
 class NFA(object):
     def __init__(self, states, init_state, actions, trans, sink_state, final_states):
@@ -89,11 +92,27 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
     tests_valid = []
     C = []
     C_tests = []
-    for test in tests:
-        C_test, C = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict)
-        if C_test:
-            tests_valid.append(test)
-            C_tests.append(C_test)
+
+    def process(test):
+        C_test, new_C = timed_mutation_analysis(muts_NFA, hypothesis, test, tran_dict)
+        return test, C_test, new_C
+
+    pool = ThreadPool(multiprocessing.cpu_count())
+    results = pool.map(process, tests)
+    pool.close()
+    pool.join()
+    for i in results:
+        C = list(set(C + i[2]))
+        if i[1]:
+            tests_valid.append(i[0])
+            C_tests.append(i[1])
+
+    # for test in tests:
+    #     C_test, C = timed_mutation_analysis(muts_NFA, hypothesis, test, C, tran_dict)
+    #     if C_test:
+    #         tests_valid.append(test)
+    #         C_tests.append(C_test)
+
     if C:
         coverage = float(len(C)) / float(len(mutants))
         print("timed mutation coverage:", coverage)
@@ -134,9 +153,10 @@ def timed_NFA_generation(mutants, hypothesis):
 
 
 # timed 变异分析
-def timed_mutation_analysis(muts_NFA, hypothesis, test_tuple, C, tran_dict):
+def timed_mutation_analysis(muts_NFA, hypothesis, test_tuple, tran_dict):
     C_test = []
     test = test_tuple.time_words
+    new_C = []
 
     # 获取test在hypothesis里的结果，用于与muts区分
     hyp_tran_dict = get_tran_dict(hypothesis)
@@ -181,8 +201,8 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test_tuple, C, tran_dict):
                 if state_flag != test_result[test_index]:
                     if mut_tran.tran_id not in C_test:
                         C_test.append(mut_tran.tran_id)
-                    if mut_tran.tran_id not in C:
-                        C.append(mut_tran.tran_id)
+                    if mut_tran.tran_id not in new_C:
+                        new_C.append(mut_tran.tran_id)
                     return True
                 tree_create(mut_tran.target, tempTime, test_index + 1, mut_tran)
                 return True
@@ -211,13 +231,13 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test_tuple, C, tran_dict):
                     if state_flag != test_result[test_index]:
                         if mut_tran.tran_id not in C_test:
                             C_test.append(mut_tran.tran_id)
-                        if mut_tran.tran_id not in C:
-                            C.append(mut_tran.tran_id)
+                        if mut_tran.tran_id not in new_C:
+                            new_C.append(mut_tran.tran_id)
                         return True
                 tree_create(cur_tran.target, tempTime, test_index + 1, mut_tran)
 
     tree_create(muts_NFA.init_state, 0, 0, None)
-    return C_test, C
+    return C_test, new_C
 
 
 # split_state mutation
@@ -235,11 +255,26 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
     tests_valid = []
     C = []
     C_tests = []
-    for test in tests:
-        C_test, C = state_mutation_analysis(muts_NFA, test, C, tran_dict)
-        if C_test:
-            tests_valid.append(test)
-            C_tests.append(C_test)
+
+    def process(test):
+        C_test, new_C = state_mutation_analysis(muts_NFA, test, tran_dict)
+        return test, C_test, new_C
+
+    pool = ThreadPool(multiprocessing.cpu_count())
+    results = pool.map(process, tests)
+    pool.close()
+    pool.join()
+    for i in results:
+        C = list(set(C + i[2]))
+        if i[1]:
+            tests_valid.append(i[0])
+            C_tests.append(i[1])
+
+    # for test in tests:
+    #     C_test, C = state_mutation_analysis(muts_NFA, test, C, tran_dict)
+    #     if C_test:
+    #         tests_valid.append(test)
+    #         C_tests.append(C_test)
     if C:
         coverage = float(len(C)) / float(len(mutants))
         print("state mutation coverage:", coverage)
@@ -304,9 +339,10 @@ def state_NFA_generation(mutations, hypothesis):
 
 
 # state 变异分析
-def state_mutation_analysis(muts_NFA, test_tuple, C, tran_dict):
+def state_mutation_analysis(muts_NFA, test_tuple, tran_dict):
     test = test_tuple.time_words
     C_test = []
+    new_C = []
 
     def tree_create(state, preTime, test_index):
         if test_index >= len(test):
@@ -326,14 +362,14 @@ def state_mutation_analysis(muts_NFA, test_tuple, C, tran_dict):
                     mId = tran.target.split('_')[0]
                     if mId not in C_test:
                         C_test.append(mId)
-                    if mId not in C:
-                        C.append(mId)
+                    if mId not in new_C:
+                        new_C.append(mId)
                 if tran.target == muts_NFA.sink_state:
                     continue
                 tree_create(tran.target, tempTime, test_index + 1)
 
     tree_create(muts_NFA.init_state, 0, 0)
-    return C_test, C
+    return C_test, new_C
 
 
 # 测试筛选
