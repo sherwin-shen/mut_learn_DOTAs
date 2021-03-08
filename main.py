@@ -11,15 +11,25 @@ from common.validate import validate
 import multiprocessing
 
 
-def main(params):
+def main(params_temp):
     debug_flag = False
-    path = params[2]
-    i = params[0]
-    j = params[1]
-    model_file = "experiments/" + path + "/" + path + "-" + str(i + 1) + ".json"
+    path_temp = params_temp[2]
+    i_temp = params_temp[0]
+    j_temp = params_temp[1]
+
+    # used to reproduce experimental results
+    random.seed(i_temp + j_temp)
+
+    model_file = "experiments/" + path_temp + "/" + path_temp + "-" + str(i_temp + 1) + ".json"
     teacher_type = "smart_teacher"
-    temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j + 1)
+    temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j_temp + 1)
+
     result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
+    # result_path = 'results/' + teacher_type + '/' + 'selection' + '/' + temp_path
+    # result_path = 'results/' + teacher_type + '/' + 'timed_op' + '/' + temp_path
+    # result_path = 'results/' + teacher_type + '/' + 'state_op' + '/' + temp_path
+    # result_path = 'results/' + teacher_type + '/' + 'random' + '/' + temp_path
+    # result_path = 'results/' + teacher_type + '/' + 'bernhard' + '/' + temp_path
 
     # get model information and build target system
     with open(model_file, 'r') as json_model:
@@ -87,18 +97,12 @@ def main(params):
 
 
 if __name__ == '__main__':
-    # # used to reproduce experimental results
-    # random.seed(3)
-
-    paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_50", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
-
-    teacher_type = "smart_teacher"
-
+    paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_30", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
     for path in paths:
-        for i in range(3):
+        for i in range(1):
             pool = multiprocessing.Pool(multiprocessing.cpu_count() - 2)
             params = []
-            for j in range(15):
+            for j in range(5):
                 params.append((i, j, path))
             results = pool.map(main, params)
             pool.close()
