@@ -168,20 +168,27 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test_tuple, C, tran_dict):
         cur_LTW = TimedWord(test[test_index].action, cur_time)
 
         if mut_tran:
-            cur_trans = hyp_tran_dict[state]
-            for cur_tran in cur_trans:
-                if cur_tran.is_passing_tran(cur_LTW):
-                    if cur_tran.reset:
-                        tempTime = 0
-                    else:
-                        tempTime = cur_time
-                    if cur_tran.target in muts_NFA.final_states:
-                        state_flag = 1
-                    elif cur_tran.target == muts_NFA.sink_state:
-                        state_flag = -1
-                    else:
-                        state_flag = 0
+            if state == mut_tran.source and mut_tran.is_passing_tran(cur_LTW):
+                cur_trans = [mut_tran]
+            else:
+                cur_trans = hyp_tran_dict[state]
+        else:
+            cur_trans = tran_dict[state]
 
+        for cur_tran in cur_trans:
+            if cur_tran.is_passing_tran(cur_LTW):
+                if cur_tran.reset:
+                    tempTime = 0
+                else:
+                    tempTime = cur_time
+                if cur_tran.target in muts_NFA.final_states:
+                    state_flag = 1
+                elif cur_tran.target == muts_NFA.sink_state:
+                    state_flag = -1
+                else:
+                    state_flag = 0
+                if isinstance(cur_tran.tran_id, str):
+                    mut_tran = cur_tran
                     if state_flag != test_result[test_index]:
                         if mut_tran.tran_id not in C_test:
                             C_test.append(mut_tran.tran_id)
@@ -190,31 +197,8 @@ def timed_mutation_analysis(muts_NFA, hypothesis, test_tuple, C, tran_dict):
                         return True
                     else:
                         tree_create(cur_tran.target, tempTime, test_index + 1, mut_tran)
-
-        else:
-            cur_trans = tran_dict[state]
-            for cur_tran in cur_trans:
-                if cur_tran.is_passing_tran(cur_LTW):
-                    if cur_tran.reset:
-                        tempTime = 0
-                    else:
-                        tempTime = cur_time
-                    if cur_tran.target in muts_NFA.final_states:
-                        state_flag = 1
-                    elif cur_tran.target == muts_NFA.sink_state:
-                        state_flag = -1
-                    else:
-                        state_flag = 0
-                    if isinstance(cur_tran.tran_id, str):
-                        mut_tran = cur_tran
-                        if state_flag != test_result[test_index]:
-                            if mut_tran.tran_id not in C_test:
-                                C_test.append(mut_tran.tran_id)
-                            if mut_tran.tran_id not in C:
-                                C.append(mut_tran.tran_id)
-                            return True
-                        else:
-                            tree_create(cur_tran.target, tempTime, test_index + 1, mut_tran)
+                else:
+                    tree_create(cur_tran.target, tempTime, test_index + 1, mut_tran)
 
     tree_create(muts_NFA.init_state, 0, 0, None)
     return C_test, C
