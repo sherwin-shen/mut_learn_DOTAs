@@ -99,7 +99,7 @@ def main(params_temp):
 if __name__ == '__main__':
     paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_30", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
     for path in paths:
-        for i in range(1):
+        for i in range(3):
             pool = multiprocessing.Pool(multiprocessing.cpu_count() - 2)
             params = []
             for j in range(15):
