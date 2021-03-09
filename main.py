@@ -102,7 +102,7 @@ if __name__ == '__main__':
         for i in range(1):
             pool = multiprocessing.Pool(multiprocessing.cpu_count() - 2)
             params = []
-            for j in range(5):
+            for j in range(15):
                 params.append((i, j, path))
             results = pool.map(main, params)
             pool.close()

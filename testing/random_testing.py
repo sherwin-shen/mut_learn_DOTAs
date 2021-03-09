@@ -525,7 +525,7 @@ def get_time_from_tran(tran, now_time, upper_guard):
     if cur_min < now_time:
         cur_min = now_time
     if guard.get_max() == float("inf"):
-        return random.randint(0, upper_guard * 2) / 2
+        return random.randint(0, upper_guard * 3 + 1) / 2
     else:
         cur_max = guard.get_max() if guard.get_closed_max() else guard.get_max() - 0.5
         time = random.randint(cur_min * 2, cur_max * 2)
