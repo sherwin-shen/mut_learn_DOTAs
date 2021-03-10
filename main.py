@@ -18,7 +18,7 @@ def main(params_temp):
     j_temp = params_temp[1]
 
     # used to reproduce experimental results
-    random.seed(i_temp + j_temp)
+    random.seed(j_temp)
 
     model_file = "experiments/" + path_temp + "/" + path_temp + "-" + str(i_temp + 1) + ".json"
     teacher_type = "smart_teacher"
