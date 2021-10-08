@@ -39,10 +39,12 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
 
     # 测试集生成
     tests = []
+    # tests_random = []
     for i in range(test_num):
-        # test = test_generation_1(hypothesisOTA, upper_guard, state_num)
-        # test = test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard)
+        # tests.append(test_generation_1(hypothesisOTA, upper_guard, state_num))
+        # tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
         tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, max_steps, upper_guard, pre_ctx))
+        # tests_random.append(tests[i].time_words)
 
     tested = []  # 缓存已测试序列
     # step1: timed变异
@@ -51,6 +53,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
         print('number of timed tests', len(timed_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
         tested = timed_tests
+
 
     # step2: 如果未找到反例, state变异
     if equivalent:
@@ -61,15 +64,13 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
             equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
             tested += state_tests
 
-        # # step3: 随机选取测试集直到数量满足nsel
-        # if equivalent and len(timed_tests) + len(state_tests) < nsel:
-        #     tests = remove_tested(tests, tested)
-        #     if nsel - len(timed_tests) - len(state_tests) > len(tests):
-        #         random_tests = tests
-        #     else:
-        #         random_tests = random.sample(tests, nsel - len(timed_tests) - len(state_tests))
-        #     print('number of random tests', len(random_tests))
-        #     equivalent, ctx = test_execution(hypothesisOTA, system, random_tests)
+    # if equivalent:
+    #     equivalent1, ctx1 = test_execution(hypothesisOTA, system, state_tests)
+    #     if ctx1:
+    #         print("selection fail:")
+    #         print([dtw.show() for dtw in ctx1])
+    #         ctx = ctx1
+
 
     return equivalent, ctx
 
@@ -100,7 +101,7 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
-        # Tsel = test_selection_old(tests_valid, C, C_tests)
+        #Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
@@ -337,7 +338,7 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
-        # Tsel = test_selection_old(tests_valid, C, C_tests)
+        #Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
@@ -438,10 +439,12 @@ def test_selection(Tests, C, C_tests):
     max_lenWeight = 0
     max_tranWeight = 0
     max_stateWeight = 0
+    max_timeWeight = 0
     min_mutWeight = float('inf')
     min_lenWeight = float('inf')
     min_tranWeight = float('inf')
     min_stateWeight = float('inf')
+    min_timeWeight = float('inf')
     for i in range(len(tests)):
         mut_num = len(cset[i])
         if mut_num > max_mutWeight:
@@ -462,7 +465,7 @@ def test_selection(Tests, C, C_tests):
         if tests[i].state_weight > max_stateWeight:
             max_stateWeight = tests[i].state_weight
     # 计算权重并归一化
-    weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight)
+    weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight, max_timeWeight, min_timeWeight)
     # 计算变异体对应的测试用例集
     cover_set = {}
     for mut_item in c:
@@ -638,17 +641,19 @@ def k_step_trans(hypothesis, q, k):
 
 
 # 权重函数
-def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight):
+def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight, max_timeWeight, min_timeWeight):
     # tests 与 cset(cover mutation set) 一一对应
     a = 0.6
-    b = 0.6
+    b = 0.0
     c = 0.2
     d = 0.2
+    e = 0.2
 
     mut_range = max_mutWeight - min_mutWeight
     len_range = max_lenWeight - min_lenWeight
     tran_range = max_tranWeight - min_tranWeight
     state_range = max_stateWeight - min_stateWeight
+    time_range = max_timeWeight - min_timeWeight
     for i in range(len(tests)):
         if mut_range == 0:
             tests[i].mut_weight = 0
@@ -667,4 +672,9 @@ def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeig
         else:
             tests[i].state_weight = (tests[i].state_weight - min_stateWeight) / state_range
 
-        tests[i].weight = a * tests[i].mut_weight + b * tests[i].len_weight + c * tests[i].tran_weight + d * tests[i].state_weight
+        if time_range == 0:
+            tests[i].time_weight = 0
+        else:
+            tests[i].time_weight = 1 - (tests[i].time_weight - min_lenWeight) / len_range
+
+        tests[i].weight = a * tests[i].mut_weight + b * tests[i].len_weight + c * tests[i].tran_weight + d * tests[i].state_weight + e * tests[i].time_weight

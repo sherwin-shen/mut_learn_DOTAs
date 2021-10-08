@@ -23,7 +23,7 @@ def random_testing_1(hypothesis, upper_guard, state_num, system):
 
 
 # 测试集生成方法（随机测试算法1）
-def test_generation_1(actions, upper_guard, state_num):
+def test_generation_0(actions, upper_guard, state_num):
     test = []
     length = random.randint(1, state_num * 2)
     for i in range(length):
@@ -31,6 +31,31 @@ def test_generation_1(actions, upper_guard, state_num):
         time = get_random_delay(upper_guard)
         temp = TimedWord(action, time)
         test.append(temp)
+    return test
+
+# 测试集生成方法（随机测试算法1）
+def test_generation_1(hypothesis, upper_guard, state_num):
+    test = TestInfo([])
+    tran_coverage = []
+    state_coverage = []
+    state = hypothesis.init_state
+    length = random.randint(1, state_num * 2)
+    for i in range(length):
+        action = hypothesis.actions[random.randint(0, len(hypothesis.actions) - 1)]
+        time = get_random_delay(upper_guard)
+        temp = TimedWord(action, time)
+        test.time_words.append(temp)
+        for t in hypothesis.trans:
+            if t.source == state and t.is_passing_tran(temp):
+                state = t.target
+                if state not in state_coverage:
+                    state_coverage.append(state)
+                if t not in tran_coverage:
+                    tran_coverage.append(t)
+                break
+    test.length = len(test.time_words)
+    test.tran_weight = len(tran_coverage)
+    test.state_weight = len(state_coverage)
     return test
 
 
@@ -54,7 +79,9 @@ def random_testing_2(hypothesis, upper_guard, state_num, system):
 
 # 测试集生成方法（随机测试算法2）
 def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard):
-    test = []
+    test = TestInfo([])
+    tran_coverage = []
+    state_coverage = []
     hypothesis = copy.deepcopy(hypothesis)
     li = random.randint(1, linfix)
     now_time = 0
@@ -67,7 +94,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
             time = get_random_delay(upper_guard)
             temp_DTW = TimedWord(action, time)
             temp_LTW = TimedWord(action, now_time + time)
-            test.append(temp_DTW)
+            test.time_words.append(temp_DTW)
             for t in hypothesis.trans:
                 if t.source == state and t.is_passing_tran(temp_LTW):
                     state = t.target
@@ -75,11 +102,29 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
                         now_time = 0
                     else:
                         now_time = temp_LTW.time
+                    if state not in state_coverage:
+                        state_coverage.append(state)
+                    if t not in tran_coverage:
+                        tran_coverage.append(t)
                     break
     while True:
         rS = random.choice(hypothesis.states)
-        p0, now_time = find_path(hypothesis, upper_guard, now_time, state, rS)
+        p0, now_time = find_path_old(hypothesis, upper_guard, now_time, state, rS)
         if p0:
+            for p in p0:
+                temp_LTW = TimedWord(p.action, now_time + p.time)
+                for tran in hypothesis.trans:
+                    if tran.is_passing_tran(temp_LTW):
+                        state = tran.target
+                        if state not in state_coverage:
+                            state_coverage.append(state)
+                        if tran not in tran_coverage:
+                            tran_coverage.append(tran)
+                        if tran.reset:
+                            now_time = 0
+                        else:
+                            now_time = temp_LTW.time
+                        break
             li = random.randint(1, linfix)
             rSteps_i = []
             for i in range(li):
@@ -97,14 +142,22 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
                             now_time = 0
                         else:
                             now_time = rsi_temp_LTW.time
+                        if state not in state_coverage:
+                            state_coverage.append(state)
+                        if t not in tran_coverage:
+                            tran_coverage.append(t)
                         break
-            test = test + p0 + rSteps
-            if len(test) > max_steps:
+            #test = test + p0 + rSteps
+            test.time_words.extend(p0 + rSteps)
+            if len(test.time_words) > max_steps:
                 break
             elif coin_flip(pstop):
                 break
         elif coin_flip(1 - pretry):
             break
+    test.length = len(test.time_words)
+    test.tran_weight = len(tran_coverage)
+    test.state_weight = len(state_coverage)
     return test
 
 
@@ -220,6 +273,7 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
     # 是否从前一反例出发
     if coin_flip(p_start) and len(pre_ctx) < max_steps:
         for t in pre_ctx:
+            test.time_weight += t.time
             temp_LTW = TimedWord(t.action, now_time + t.time)
             for tran in tran_dict[state]:
                 if tran.is_passing_tran(temp_LTW):
@@ -244,6 +298,7 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
                 delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
                 if delay_time is None:
                     continue
+                test.time_weight += delay_time
                 test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
                 if next_tran.reset:
@@ -262,6 +317,7 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
                 delay_time = get_time_from_tran(next_tran, now_time, upper_guard)
                 if delay_time is None:
                     continue
+                test.time_weight += delay_time
                 test.time_words.append(TimedWord(next_tran.action, delay_time))
                 state = next_tran.target
                 if next_tran.reset:
@@ -286,6 +342,7 @@ def test_generation_4(hypothesis, p_start, pstop, pvalid, max_steps, upper_guard
             test.time_words.extend(path_dtw)
             for p in path_dtw:
                 temp_LTW = TimedWord(p.action, now_time + p.time)
+                test.time_weight += p.time
                 for tran in tran_dict[state]:
                     if tran.is_passing_tran(temp_LTW):
                         state = tran.target

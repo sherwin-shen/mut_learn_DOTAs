@@ -17,6 +17,7 @@ class System(object):
         self.test_num_cache = 0
         self.action_num = 0
         self.cache = {}
+        self.total_time = 0
 
     # Perform tests(DTWs) on the system, return value and DRTWs(full)
     def test_DTWs(self, DTWs):
@@ -32,6 +33,7 @@ class System(object):
         cur_state = self.init_state
         for dtw in DTWs:
             self.action_num += 1
+            self.total_time += dtw.time
             time = dtw.time + now_time
             new_LTW = TimedWord(dtw.action, time)
             flag = False
@@ -46,6 +48,7 @@ class System(object):
                         now_time = time
                         reset = False
                     DRTWs.append(ResetTimedWord(dtw.action, dtw.time, reset))
+
                     break
             if not flag:
                 DRTWs.append(ResetTimedWord(dtw.action, dtw.time, True))

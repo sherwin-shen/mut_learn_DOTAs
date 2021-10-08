@@ -20,11 +20,12 @@ def main(params_temp):
     # used to reproduce experimental results
     random.seed(j_temp)
 
-    model_file = "experiments/" + path_temp + "/" + path_temp + "-" + str(i_temp + 1) + ".json"
+    model_file = "benchmarks/" + path_temp + "/" + path_temp + "-" + str(i_temp + 3) + ".json"
     teacher_type = "smart_teacher"
     temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j_temp + 1)
 
-    result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
+    result_path = 'results/' + teacher_type + '/' + 'mutation-totaltime_timeweight' + '/' + temp_path
+    #result_path = 'results/' + teacher_type + '/' + 'selection-totaltime_timeweight' + '/' + temp_path
     # result_path = 'results/' + teacher_type + '/' + 'selection' + '/' + temp_path
     # result_path = 'results/' + teacher_type + '/' + 'timed_op' + '/' + temp_path
     # result_path = 'results/' + teacher_type + '/' + 'state_op' + '/' + temp_path
@@ -41,7 +42,7 @@ def main(params_temp):
     start_time = time.time()
     print("********** learning starting *************")
     if teacher_type == "smart_teacher":
-        learned_system, mq_num, eq_num, test_num, test_num_cache, action_num, table_num = learnOTA_smart(system, debug_flag)
+        learned_system, mq_num, eq_num, test_num, test_num_cache, action_num, total_time, table_num = learnOTA_smart(system, debug_flag)
     elif teacher_type == "normal_teacher":
         raise Exception('暂不支持 normal_teacher！')
     else:
@@ -65,6 +66,7 @@ def main(params_temp):
         print("Total number of tests (no-cache): " + str(test_num))
         print("Total number of tests (with-cache): " + str(test_num_cache))
         print("Total number of actions: " + str(action_num))
+        print("Total number of actions: " + str(total_time))
         print("Total number of tables explored: " + str(table_num))
         print("Completely correct: " + str(correct_flag) + "   Testing pass rate: " + str(passing_rate))
         print("*********** learning ending  *************")
@@ -79,6 +81,7 @@ def main(params_temp):
             "testNum": test_num,
             "testNumCache": test_num_cache,
             "actionNum": action_num,
+            "totalTime": total_time,
             "tableNum": table_num,
             "correct": correct_flag,
             "passingRate": passing_rate,
@@ -97,10 +100,12 @@ def main(params_temp):
 
 
 if __name__ == '__main__':
-    paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_30", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
+    #paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_30", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
+    #paths = ["4_2_10"]
+    paths = ["case"]
     for path in paths:
-        for i in range(3):
-            pool = multiprocessing.Pool(multiprocessing.cpu_count() - 2)
+        for i in range(1):
+            pool = multiprocessing.Pool(multiprocessing.cpu_count() - 1)
             params = []
             for j in range(15):
                 params.append((i, j, path))

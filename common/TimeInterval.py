@@ -279,6 +279,14 @@ def guard_split(guard, step, upper_guard):
     closed_max = ']' if guard.get_closed_max() else ')'
     if min_value >= upper_guard or min_value + step > upper_guard:
         return [guard]
+    #if min_value > upper_guard or (min_value == upper_guard and not guard.get_closed_min()):
+    #    return [guard]
+    #if min_value == upper_guard and guard.get_closed_min():
+    #    temp_guards.append(Guard("[" + str(min_value) + ',' + str(min_value) + ']'))
+    #    temp_guards.append(Guard("(" + str(min_value) + ',' + str(max_value) + ')'))
+    #    return  temp_guards
+    #if min_value + step > upper_guard:
+
     temp_guards.append(Guard(closed_min + str(min_value) + ',' + str(min_value + step) + ')'))
     temp_guards.append(Guard("[" + str(min_value + step) + ',' + str(min_value + step) + ']'))
     min_value += step

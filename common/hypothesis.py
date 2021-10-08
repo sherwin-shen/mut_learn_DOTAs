@@ -74,7 +74,7 @@ class OTA(object):
                     temp_max_value = float(c.max_value)
                 if max_time_value < temp_max_value:
                     max_time_value = temp_max_value
-        return max_time_value + 1
+        return max_time_value
 
     # build simple hypothesis - merge guards
     def build_simple_hypothesis(self):
