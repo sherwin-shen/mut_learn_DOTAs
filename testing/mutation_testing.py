@@ -41,8 +41,8 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
     tests = []
     # tests_random = []
     for i in range(test_num):
-        # tests.append(test_generation_1(hypothesisOTA, upper_guard, state_num))
-        # tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
+        #tests.append(test_generation_1(hypothesisOTA, upper_guard, state_num))
+        #tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
         tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, max_steps, upper_guard, pre_ctx))
         # tests_random.append(tests[i].time_words)
 
@@ -464,6 +464,10 @@ def test_selection(Tests, C, C_tests):
             min_stateWeight = tests[i].state_weight
         if tests[i].state_weight > max_stateWeight:
             max_stateWeight = tests[i].state_weight
+        if tests[i].time_weight < min_timeWeight:
+            min_timeWeight = tests[i].time_weight
+        if tests[i].time_weight > max_timeWeight:
+            max_timeWeight = tests[i].time_weight
     # 计算权重并归一化
     weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight, max_timeWeight, min_timeWeight)
     # 计算变异体对应的测试用例集
@@ -644,10 +648,10 @@ def k_step_trans(hypothesis, q, k):
 def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight, max_timeWeight, min_timeWeight):
     # tests 与 cset(cover mutation set) 一一对应
     a = 0.6
-    b = 0.0
+    b = 0.4
     c = 0.2
-    d = 0.2
-    e = 0.2
+    d = 0.0
+    e = 0.4
 
     mut_range = max_mutWeight - min_mutWeight
     len_range = max_lenWeight - min_lenWeight
@@ -675,6 +679,6 @@ def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeig
         if time_range == 0:
             tests[i].time_weight = 0
         else:
-            tests[i].time_weight = 1 - (tests[i].time_weight - min_lenWeight) / len_range
+            tests[i].time_weight = 1 - (tests[i].time_weight - min_timeWeight) / time_range
 
         tests[i].weight = a * tests[i].mut_weight + b * tests[i].len_weight + c * tests[i].tran_weight + d * tests[i].state_weight + e * tests[i].time_weight

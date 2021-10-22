@@ -45,6 +45,7 @@ def test_generation_1(hypothesis, upper_guard, state_num):
         time = get_random_delay(upper_guard)
         temp = TimedWord(action, time)
         test.time_words.append(temp)
+        test.time_weight += time
         for t in hypothesis.trans:
             if t.source == state and t.is_passing_tran(temp):
                 state = t.target
@@ -95,6 +96,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
             temp_DTW = TimedWord(action, time)
             temp_LTW = TimedWord(action, now_time + time)
             test.time_words.append(temp_DTW)
+            test.time_weight += time
             for t in hypothesis.trans:
                 if t.source == state and t.is_passing_tran(temp_LTW):
                     state = t.target
@@ -113,6 +115,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
         if p0:
             for p in p0:
                 temp_LTW = TimedWord(p.action, now_time + p.time)
+                test.time_weight += p.time
                 for tran in hypothesis.trans:
                     if tran.is_passing_tran(temp_LTW):
                         state = tran.target
@@ -134,6 +137,7 @@ def test_generation_2(hypothesis, pretry, pstop, max_steps, linfix, upper_guard)
                 time = get_random_delay(upper_guard)
                 rsi_temp_DTW = TimedWord(rsi, time)
                 rsi_temp_LTW = TimedWord(rsi, now_time + time)
+                test.time_weight += time
                 rSteps.append(rsi_temp_DTW)
                 for t in hypothesis.trans:
                     if t.source == state and t.is_passing_tran(rsi_temp_LTW):
