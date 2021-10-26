@@ -102,6 +102,27 @@ class OTA(object):
                             tran_num += 1
         return OTA(actions, states, trans, init_state, accept_states, sink_state)
 
+    def simple_transitions(self):
+        #trans = []
+        tran_num = len(self.trans)
+        for s in self.states:
+            for t in self.states:
+                for action in self.actions:
+                    for reset in [True, False]:
+                        temp = []
+                        for tran in self.trans:
+                            if tran.source == s and tran.action == action and tran.target == t and tran.reset == reset:
+                                temp.append(tran)
+                        if temp:
+                            guards = []
+                            for i in temp:
+                                self.trans.remove(i)
+                                guards += i.guards
+                            guards = simple_guards(guards)
+                            self.trans.append(OTATran(tran_num, s, action, guards, reset, t))
+                            tran_num += 1
+        #return OTA(actions, states, trans, init_state, accept_states, sink_state)
+
 
 class DiscreteOTATran(object):
     def __init__(self, tran_id, source, action, time_point, reset, target):
@@ -136,6 +157,16 @@ class OTATran(object):
         for i in range(1, len(self.guards)):
             temp = temp + 'U' + self.guards[i].show()
         return temp
+
+    def equal_trans(self, tran):
+        if not(self.source == tran.source and self.action == tran.action and self.target == tran.target and len(self.guards) == len(tran.guards)):
+            return False
+        else:
+            for i in range(len(self.guards)):
+                if not self.guards[i].guard == tran.guards[i].guard:
+                    return False
+        return True
+
 
 
 def struct_discreteOTA(table, actions):

@@ -24,7 +24,7 @@ def main(params_temp):
     teacher_type = "smart_teacher"
     temp_path = '/'.join(model_file.split('/')[: -1]) + '/' + model_file.split('/')[-1].split('.')[0] + "/" + str(j_temp + 1)
 
-    result_path = 'results/' + teacher_type + '/' + 'mutation' + '/' + temp_path
+    result_path = 'results/' + teacher_type + '/' + 'mutation-old' + '/' + temp_path
     # result_path = 'results/' + teacher_type + '/' + 'selection' + '/' + temp_path
     # result_path = 'results/' + teacher_type + '/' + 'timed_op' + '/' + temp_path
     # result_path = 'results/' + teacher_type + '/' + 'state_op' + '/' + temp_path
@@ -100,6 +100,7 @@ def main(params_temp):
 
 if __name__ == '__main__':
     paths = ["case", "4_2_10", "6_2_10", "6_2_20", "6_2_30", "6_4_10", "6_6_10", "8_2_10", "10_2_10"]
+    #paths = ["4_2_10"]
     for path in paths:
         for i in range(3):
             pool = multiprocessing.Pool(multiprocessing.cpu_count() - 1)
