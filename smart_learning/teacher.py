@@ -1,7 +1,7 @@
 import copy
 from common.TimedWord import TimedWord, LRTW_to_LTW, DRTW_to_LRTW
 from testing.random_testing import random_testing_1, random_testing_2, random_testing_3, random_testing_4
-from testing.mutation_testing import mutation_testing
+from testing.mutation_testing import mutation_testing, model_based_mutation_testing
 
 
 def TQs(LTWs, system):
@@ -27,6 +27,11 @@ def EQs(hypothesisOTA, system, pre_ctx):
 
     # 测试5 - mutation-based-testing
     equivalent, ctx = mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system)
+
+    # 测试6 - model-based-mutation testing
+    # equivalent, ctx = model_based_mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system)
+
+
 
     if ctx is not None:
         ctx = minimize_counterexample(hypothesisOTA, system, ctx)

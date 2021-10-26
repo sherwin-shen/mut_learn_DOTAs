@@ -1,10 +1,11 @@
 import random
 import math
 from copy import deepcopy
+from common.equivalence import equivalence
 from common.TimedWord import TimedWord
 from common.hypothesis import OTATran
 from common.TimeInterval import guard_split
-from testing.random_testing import test_generation_1, test_generation_2, test_generation_4
+from testing.random_testing import test_generation_1, test_generation_2, test_generation_4, get_random_delay
 
 
 class NFA(object):
@@ -39,10 +40,12 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
 
     # 测试集生成
     tests = []
+    # tests_random = []
     for i in range(test_num):
-        # test = test_generation_1(hypothesisOTA, upper_guard, state_num)
-        # test = test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard)
+        #tests.append(test_generation_1(hypothesisOTA, upper_guard, state_num))
+        #tests.append(test_generation_2(hypothesisOTA, pretry, pstop, max_steps, linfix, upper_guard))
         tests.append(test_generation_4(hypothesisOTA, pstart, pstop, pvalid, max_steps, upper_guard, pre_ctx))
+        # tests_random.append(tests[i].time_words)
 
     tested = []  # 缓存已测试序列
     # step1: timed变异
@@ -51,6 +54,7 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
         print('number of timed tests', len(timed_tests))
         equivalent, ctx = test_execution(hypothesisOTA, system, timed_tests)
         tested = timed_tests
+
 
     # step2: 如果未找到反例, state变异
     if equivalent:
@@ -61,15 +65,31 @@ def mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
             equivalent, ctx = test_execution(hypothesisOTA, system, state_tests)
             tested += state_tests
 
-        # # step3: 随机选取测试集直到数量满足nsel
-        # if equivalent and len(timed_tests) + len(state_tests) < nsel:
-        #     tests = remove_tested(tests, tested)
-        #     if nsel - len(timed_tests) - len(state_tests) > len(tests):
-        #         random_tests = tests
-        #     else:
-        #         random_tests = random.sample(tests, nsel - len(timed_tests) - len(state_tests))
-        #     print('number of random tests', len(random_tests))
-        #     equivalent, ctx = test_execution(hypothesisOTA, system, random_tests)
+    return equivalent, ctx
+
+
+def model_based_mutation_testing(hypothesisOTA, upper_guard, state_num, pre_ctx, system):
+    equivalent = True
+    ctx = None
+
+    # 参数配置 - 变异相关
+    duration = system.get_minimal_duration(upper_guard)  # It can also be set by the user.
+    nacc = 8
+    k = 1
+
+    # 测试集生成
+    tests = []
+
+    tested = []  # 缓存已测试序列
+    # step1: timed变异
+    equivalent, ctx, timed_tests = mutation_timed_inreal(system, hypothesisOTA, duration, upper_guard, tests)
+    tested = timed_tests
+
+
+    # step2: 如果未找到反例, state变异
+    if equivalent:
+        equivalent, ctx, state_tests = mutation_state_inreal(system, hypothesisOTA, state_num, nacc, k, upper_guard, tests)
+        tested += state_tests
 
     return equivalent, ctx
 
@@ -100,7 +120,7 @@ def mutation_timed(hypothesis, duration, upper_guard, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
-        # Tsel = test_selection_old(tests_valid, C, C_tests)
+        #Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
 
@@ -123,6 +143,80 @@ def timed_mutation_generation(hypothesis, duration, upper_guard):
                 mut_num += 1
                 mutations.append(temp)
     return mutations
+
+# timed mutation generation/operator
+def mutation_timed_inreal(system, hypothesis, duration, upper_guard, tests):
+    mut_num = 0
+
+    equ = True
+    ctx = None
+
+    for tran in hypothesis.trans:
+        if tran.source == hypothesis.sink_state and tran.target == hypothesis.sink_state:
+            continue
+        trans = []
+        for guard in tran.guards:
+            temp_guards = guard_split(guard, duration, upper_guard)
+            if not temp_guards:
+                trans.append(OTATran('', tran.source, tran.action, [guard], tran.reset, tran.target))
+            for temp_guard in temp_guards:
+                trans.append(OTATran('', tran.source, tran.action, [temp_guard], tran.reset, tran.target))
+        for temp_tran in trans:
+            for state in hypothesis.states:
+                temp = deepcopy(temp_tran)
+                temp.reset = not temp.reset
+                temp.target = state
+                temp.tran_id = 'mut' + str(mut_num)
+                Mutant = deepcopy(hypothesis)
+                for t in Mutant.trans:
+                    if t.tran_id == tran.tran_id:
+                        Mutant.trans.remove(t)
+                        break
+                mut_trans = []
+                for tt in trans:
+                    mut_trans.append(tt)
+                mut_trans.remove(temp_tran)
+                Mutant.trans.append(temp)
+                Mutant.trans.extend(mut_trans)
+                Mutant.simple_transitions()
+
+                correct_flag, test = equivalence(hypothesis, Mutant, upper_guard)
+                if not correct_flag and test:
+                    test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
+                    tests.append(test)
+                    equ, ctx = test_execution(hypothesis, system, [test])
+                    if not equ:
+                        return equ, ctx, tests
+                mut_num += 1
+
+                if temp_tran.target == state:
+                    continue
+                temp = deepcopy(temp_tran)
+                temp.target = state
+                temp.tran_id = 'mut' + str(mut_num)
+                Mutant = deepcopy(hypothesis)
+                for t in Mutant.trans:
+                    if t.tran_id == tran.tran_id:
+                        Mutant.trans.remove(t)
+                        break
+                mut_trans = []
+                for tt in trans:
+                    mut_trans.append(tt)
+                mut_trans.remove(temp_tran)
+                Mutant.trans.append(temp)
+                Mutant.trans.extend(mut_trans)
+                Mutant.simple_transitions()
+
+                correct_flag, test = equivalence(hypothesis, Mutant, upper_guard)
+                if not correct_flag and test:
+                    test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
+                    tests.append(test)
+                    equ, ctx = test_execution(hypothesis, system, [test])
+                    if not equ:
+                        return equ, ctx, tests
+                mut_num += 1
+    return equ, ctx, tests
+
 
 
 # 生成 timed_mutant_NFA 结构
@@ -337,9 +431,74 @@ def mutation_state(hypothesis, state_num, nacc, k, tests):
     # 测试筛选
     if C_tests:
         Tsel = test_selection(tests_valid, C, C_tests)
-        # Tsel = test_selection_old(tests_valid, C, C_tests)
+        #Tsel = test_selection_old(tests_valid, C, C_tests)
         print("T/Tsel:", len(tests_valid), len(Tsel))
     return Tsel
+
+def mutation_state_inreal(system, hypothesis, state_num, nacc, k, upper_guard, tests):
+    #Tsel = []
+    mut_num = 0
+    equ = True
+    ctx=None
+    # 生成变异体
+    for state in hypothesis.states:
+        if state == hypothesis.sink_state:
+            continue
+        set_accq = get_all_acc(hypothesis, state, state_num)
+        if len(set_accq) < 2:
+            continue
+        elif nacc >= len(set_accq):
+            subset_accq = set_accq
+        else:
+            subset_accq = random.sample(set_accq, nacc)
+        for s1 in subset_accq:
+            for s2 in subset_accq:
+                if s1 == s2:
+                    continue
+                else:
+                    if not s1:
+                        continue
+                    else:
+                        suffix = arg_maxs(s1, s2)
+                        prefix = s1[0:len(s1) - len(suffix)]
+                        temp_state = s1[-1].target
+                        if len(prefix) == 0:
+                            p_tran = OTATran('', hypothesis.init_state, None, None, True, hypothesis.init_state)
+                        else:
+                            p_tran = prefix[len(prefix) - 1]
+                    mutants = []
+                    trans_list = k_step_trans(hypothesis, temp_state, k)
+                    for distSeq in trans_list:
+                        Mutant = deepcopy(hypothesis)
+                        new_s = len(Mutant.states)
+                        Mutant.states.append(new_s)
+                        for t in Mutant.trans:
+                            if p_tran.equal_trans(t):
+                                t.target = new_s
+                                break
+                        mut_tran = [p_tran] + suffix + distSeq
+                        for i in range(1, len(mut_tran)):
+                            pre_s = new_s
+                            for tran in hypothesis.trans:
+                                if tran.source == mut_tran[i].source and not tran.equal_trans(mut_tran[i]):
+                                    Mutant.trans.append(OTATran(str(len(Mutant.trans)), pre_s, tran.action, tran.guards, tran.reset, tran.target))
+                            if i < len(mut_tran)-1:
+                                new_s = len(Mutant.states)
+                                Mutant.states.append(new_s)
+                                Mutant.trans.append(OTATran(str(len(Mutant.trans)), pre_s, mut_tran[i].action, mut_tran[i].guards, mut_tran[i].reset, new_s))
+                            else:
+                                Mutant.trans.append(OTATran(str(len(Mutant.trans)), pre_s, mut_tran[i].action, mut_tran[i].guards, mut_tran[i].reset, mut_tran[i].target))
+                                if not mut_tran[i].source in hypothesis.accept_states:
+                                    Mutant.accept_states.append(pre_s)
+                        correct_flag, test = equivalence(hypothesis, Mutant, upper_guard)
+                        if not correct_flag and test:
+                            test.append(TimedWord(random.choice(hypothesis.actions), get_random_delay(upper_guard)))
+                            tests.append(test)
+                            equ, ctx = test_execution(hypothesis, system, [test])
+                            if not equ:
+                                return equ, ctx, tests
+                        mut_num += 1
+    return equ, ctx, tests
 
 
 # split-state mutation generation
@@ -438,10 +597,12 @@ def test_selection(Tests, C, C_tests):
     max_lenWeight = 0
     max_tranWeight = 0
     max_stateWeight = 0
+    max_timeWeight = 0
     min_mutWeight = float('inf')
     min_lenWeight = float('inf')
     min_tranWeight = float('inf')
     min_stateWeight = float('inf')
+    min_timeWeight = float('inf')
     for i in range(len(tests)):
         mut_num = len(cset[i])
         if mut_num > max_mutWeight:
@@ -461,8 +622,12 @@ def test_selection(Tests, C, C_tests):
             min_stateWeight = tests[i].state_weight
         if tests[i].state_weight > max_stateWeight:
             max_stateWeight = tests[i].state_weight
+        if tests[i].time_weight < min_timeWeight:
+            min_timeWeight = tests[i].time_weight
+        if tests[i].time_weight > max_timeWeight:
+            max_timeWeight = tests[i].time_weight
     # 计算权重并归一化
-    weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight)
+    weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight, max_timeWeight, min_timeWeight)
     # 计算变异体对应的测试用例集
     cover_set = {}
     for mut_item in c:
@@ -638,17 +803,19 @@ def k_step_trans(hypothesis, q, k):
 
 
 # 权重函数
-def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight):
+def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeight, max_tranWeight, min_tranWeight, max_stateWeight, min_stateWeight, max_timeWeight, min_timeWeight):
     # tests 与 cset(cover mutation set) 一一对应
     a = 0.6
-    b = 0.6
+    b = 0.4
     c = 0.2
-    d = 0.2
+    d = 0.0
+    e = 0.4
 
     mut_range = max_mutWeight - min_mutWeight
     len_range = max_lenWeight - min_lenWeight
     tran_range = max_tranWeight - min_tranWeight
     state_range = max_stateWeight - min_stateWeight
+    time_range = max_timeWeight - min_timeWeight
     for i in range(len(tests)):
         if mut_range == 0:
             tests[i].mut_weight = 0
@@ -667,4 +834,9 @@ def weight(tests, cset, max_mutWeight, min_mutWeight, max_lenWeight, min_lenWeig
         else:
             tests[i].state_weight = (tests[i].state_weight - min_stateWeight) / state_range
 
-        tests[i].weight = a * tests[i].mut_weight + b * tests[i].len_weight + c * tests[i].tran_weight + d * tests[i].state_weight
+        if time_range == 0:
+            tests[i].time_weight = 0
+        else:
+            tests[i].time_weight = 1 - (tests[i].time_weight - min_timeWeight) / time_range
+
+        tests[i].weight = a * tests[i].mut_weight + b * tests[i].len_weight + c * tests[i].tran_weight + d * tests[i].state_weight + e * tests[i].time_weight
